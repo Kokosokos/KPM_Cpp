@@ -1,0 +1,5 @@
+/test/**
+/Release/**
+/ReleaseMPI/**
+/Debug/**
+*.dat
