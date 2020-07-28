@@ -31,29 +31,39 @@ int main(int argc, char *argv[]) {
 	int K = 1000;
 	int R = 20;
 	KPM kpm( K, R );
-	//	kpm.m_emin = -10.5022;
-	//	kpm.m_emax = 4367.96;
-//	if(rank == 0)
-//	{
-	kpm.findEmin();
-	kpm.findEmax();
+	kpm.m_emin = -10.5022;
+	kpm.m_emax = 4367.96;
+	//	if(rank == 0)
+	//	{
+	//	kpm.findEmin();
+	//	kpm.findEmax();
+	kpm.readLAMMPSData("test/a_data.file");
+
 	kpm.HTilde();
-//	}
+	kpm.readAF("test/dF.csv");
 
-	Vector gp = kpm.getCoeffDOS();
+	//	std::cout<<kpm.m_af<<std::endl;
+	//	}
 
+//	Vector gp = kpm.getCoeffDOS();
+	kpm.setR(1000);
+	Vector gp2 = kpm.getCoeffGammaDOS();
 	if(rank == 0)
 	{
-		Vector freq = arange(200, sgn(kpm.m_emin)*sqrt(fabs(kpm.m_emin)), sqrt(kpm.m_emax));
-		Vector dos = kpm.sumSeries(freq, gp);
-		kpm.write("gP.dat",gp);
-		kpm.write("DOS.dat",freq, dos);
+		Vector freq = arange(400, sgn(kpm.m_emin)*sqrt(fabs(kpm.m_emin)), sqrt(kpm.m_emax));
+//		Vector dos = kpm.sumSeries(freq, gp);
+		Vector gammaDos = kpm.sumSeries(freq, gp2);
+//		kpm.write("gP.dat",gp);
+//		kpm.write("DOS.dat",freq, dos);
+
+		kpm.write("gPgamma.dat",gp2);
+		kpm.write("gammaDOS.dat",freq, gammaDos);
 		t = clock() - t;
 
-		printf ("It took me %d clicks (%f seconds).\n",t,((float)t)/CLOCKS_PER_SEC);
+		printf ("It took me %d clicks (%f seconds).\n",(int) t,((float)t)/CLOCKS_PER_SEC);
 		FILE *stream;
 		stream = fopen("time.dat", "a");
-		fprintf(stream, "%d %d %d %f\n", K, R, t, ((float)t)/CLOCKS_PER_SEC);
+		fprintf(stream, "%d %d %d %f\n", K, R, (int) t, ((float)t)/CLOCKS_PER_SEC);
 	}
 
 

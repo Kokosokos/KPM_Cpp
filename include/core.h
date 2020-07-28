@@ -160,6 +160,27 @@ inline Vector normal( unsigned int nn)
 	return normal(nn, int(time(NULL)));
 }
 
+
+inline void processRunningStatus(float progress)
+{
+    int barWidth = 70;
+
+    std::cout << "[";
+    int pos = barWidth * progress;
+    for (int i = 0; i < barWidth; ++i) {
+        if (i < pos) std::cout << "=";
+        else if (i == pos) std::cout << ">";
+        else std::cout << " ";
+    }
+    std::cout << "] " << int(progress * 100.0) << " %\r";
+    std::cout.flush();
+}
+
+inline void processEnded()
+{
+	 std::cout<<std::endl;
+	 std::cout.flush();
+}
 #endif
 
 #include "mpi.h"

@@ -25,6 +25,8 @@ public:
 	void write(string filename, Vector v1, Vector v2);
 	void write(string filename, Vector v1);
 	void  readAF(string filename);
+	void readLAMMPSData(string filename); //reads m_M (particle masses) from lammps data file
+
 	//-----------------------------------------
 
 
@@ -37,7 +39,11 @@ public:
 	 */
 	void findEmax();
 
+	/**
+	 * @brief Sets maximum polynomial degree. Invokes @jacksonKernel(K)@ to recalculate jackson kernel.
+	 */
 	void setK(unsigned int K);
+	void setR(unsigned int R);
 
 	KPM();
 	KPM(unsigned int K, unsigned int R, float nuEdge = 0.05);
@@ -57,6 +63,9 @@ public:
 
 
 	//private:
+	//INPUT filenames
+	//-----------------------------------------
+
 	/**
 	 * @brief Filename of the data of the CSR-matrix.
 	 */
@@ -76,6 +85,7 @@ public:
 	 * @brief Filename of the affine force field vector. (Needed for GammaDOS and G'(G'') calculations. Not needed for VDOS only.)
 	 */
 	string m_faf;
+	//-----------------------------------------
 
 	/**
 	 * @brief Total number of non zero elements in the matrix
@@ -95,6 +105,16 @@ public:
 	 * @brief Affine force field vector.
 	 */
 	Vector m_af;
+
+	/**
+	 * @brief Vector of particle masses (x dim)
+	 */
+	Vector m_M;
+
+	/**
+	 * @brief Vector of particle masses (inverse squared)
+	 */
+	Vector m_MinvSqrt;
 
 	/**
 	 * @brief MAximum eigenvalue

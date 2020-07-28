@@ -5,6 +5,13 @@
  *      Author: ivan
  */
 
+//To read lammps data file
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <iterator>
+
+
 #include "KPM.h"
 #include <Eigen/Core>
 #include <Eigen/SparseCore>
@@ -15,7 +22,8 @@
 #include <Spectra/SymEigsSolver.h>
 using namespace Spectra;
 
-KPM::KPM():m_nuEdge(0.05), m_R(100)  {
+
+KPM::KPM(): m_R(100), m_nuEdge(0.05)  {
 	setK(100);
 	m_fndata	= "test/H.data.dat";
 	m_fnindptr	= "test/H.indptr.dat";
@@ -25,7 +33,7 @@ KPM::KPM():m_nuEdge(0.05), m_R(100)  {
 
 }
 
-KPM::KPM(unsigned int K, unsigned int R, float nuEdge):m_nuEdge(nuEdge),  m_R(R)
+KPM::KPM(unsigned int K, unsigned int R, float nuEdge): m_R(R), m_nuEdge(nuEdge)
 {
 	m_fndata	= "test/H.data.dat";
 	m_fnindptr	= "test/H.indptr.dat";
@@ -63,14 +71,119 @@ void KPM::write(string filename, Vector v1)
 
 void  KPM::readAF(string filename)
 {
+	m_faf = filename;
 	FILE *stream;
 	stream = fopen(filename.c_str(), "r");
-	for(int i = 0; i< v1.size(); ++i )
+	if (stream==NULL) perror ("Error opening file for AF");
+	float val = 0.0f;
+	vector<double> v;
+	while(fscanf(stream, "%f", &val) != EOF)
 	{
-		fprintf(stream, "%f\n", v1[i]);
+		v.push_back(val);
 	}
 	fclose(stream);
+	//	m_af = Vector(v.data());
+	//	double* ptr = &v[0];
+	m_af = Vector::Map(v.data(), v.size());
+	m_af = m_af.cwiseProduct(m_MinvSqrt);
+	//	m_af = my_vect;
 }
+void KPM::readLAMMPSData(string filename)
+{
+	unsigned int curLine = 0;
+
+
+	std::ifstream fileInput;
+	string line;
+	fileInput.open(filename.c_str());
+
+
+	//Search for N atoms
+	//	string search = "atoms";
+	int nM = 0;
+	int N=0; // number of atoms
+	vector<double> masses;
+	vector<int> massIds;
+	vector<double> massesFull;
+	while(getline(fileInput, line))
+	{
+		curLine++;
+
+		if (line.find("atoms", 0) != string::npos)
+		{
+			std::istringstream iss(line);
+
+			std::vector<std::string> results((std::istream_iterator<std::string>(iss)),
+					std::istream_iterator<std::string>());
+			iss =  std::istringstream(results[0]);
+			iss >> N;
+		}
+
+		if (line.find("atom types", 0) != string::npos)
+		{
+			std::istringstream iss(line);
+
+			std::vector<std::string> results((std::istream_iterator<std::string>(iss)),
+					std::istream_iterator<std::string>());
+
+			iss =  std::istringstream(results[0]);
+			iss >> nM;
+		}
+
+
+		if (line.find("Masses", 0) != string::npos)
+		{
+			getline(fileInput, line);
+			float m=0.0f;
+			for (int i =0; i < nM; ++i)
+			{
+				getline(fileInput, line);
+				std::istringstream iss(line);
+
+				std::vector<std::string> results((std::istream_iterator<std::string>(iss)),
+						std::istream_iterator<std::string>());
+
+				iss =  std::istringstream(results[1]);
+				iss>>m;
+				masses.push_back(m);
+			}
+
+		}
+
+		if (line.find("Atoms", 0) != string::npos)
+		{
+			getline(fileInput, line);
+
+			int mid=0;
+			for (int i =0; i < N; ++i)
+			{
+				getline(fileInput, line);
+				std::istringstream iss(line);
+
+				std::vector<std::string> results((std::istream_iterator<std::string>(iss)),
+						std::istream_iterator<std::string>());
+
+				iss =  std::istringstream(results[2]);
+				iss>>mid;
+				massIds.push_back(mid);
+
+				//Dimensionality == 3
+				double minvsqrt = 1.0 / sqrt(masses[mid-1]);
+				massesFull.push_back(minvsqrt);
+				massesFull.push_back(minvsqrt);
+				massesFull.push_back(minvsqrt);
+			}
+			break;
+		}
+	}
+//	m_M = Vector::Map(massesFull.data(), massesFull.size());
+	m_MinvSqrt = Vector::Map(massesFull.data(), massesFull.size());
+	//Search for masses values
+
+
+	fileInput.close();
+}
+
 void KPM::readCSR()
 {
 
@@ -88,7 +201,7 @@ void KPM::readCSR()
 	}
 	fclose(stream);
 	unsigned int N=indptr.size()-1;
-	cout<<"N:"<<N<<endl;
+	//	cout<<"N:"<<N<<endl;
 
 	m_DOF = N;
 
@@ -160,7 +273,7 @@ void KPM::readCSR()
 	}
 	//	m_hessian.makeCompressed();
 	//get 1 element
-//	cout<<m_hessian.coeff(1,1);
+	//	cout<<m_hessian.coeff(1,1);
 #endif
 
 }
@@ -172,7 +285,7 @@ void KPM::findEmin()
 	GenEigsSolver< double, SMALLEST_REAL, SparseGenMatProd<double, c_myStorageOrder> > eigs(&op, 3, 7);
 	// Initialize and compute
 	eigs.init();
-	int nconv = eigs.compute();
+	eigs.compute();
 	// Retrieve results
 	if(eigs.info() == SUCCESSFUL)
 		evalues = eigs.eigenvalues();
@@ -191,7 +304,7 @@ void KPM::findEmax()
 	GenEigsSolver< double, LARGEST_MAGN, SparseGenMatProd<double, c_myStorageOrder> > eigs(&op, 3, 7);
 	// Initialize and compute
 	eigs.init();
-	int nconv = eigs.compute();
+	eigs.compute();
 	// Retrieve results
 	if(eigs.info() == SUCCESSFUL)
 		evalues = eigs.eigenvalues();
@@ -206,6 +319,11 @@ void KPM::setK(unsigned int K)
 {
 	m_K = K;
 	jacksonKernel(K);
+}
+
+void KPM::setR(unsigned int R)
+{
+	m_R = R;
 }
 
 //Rescaling to ~[-1,1] routines
@@ -245,41 +363,7 @@ void KPM::jacksonKernel(int K)
 	m_jk += sin(c_PI*n/(K+1))/tan(c_PI/(K+1)) ;
 	m_jk *= (1.0/(K+1));
 }
-//Vector KPM::DOS()
-//{
-//	Vector gP = zeros(m_K); // gauss projection
-//	for (int r = 0; r < m_R; ++r)
-//	{
-//		if (r % 10 == 0)
-//			cout<<float(r)/m_R*100<<"%"<<endl;
-//		//k = 0
-//		Vector v_r = normal(m_DOF);
-//		v_r=v_r/v_r.norm();
-//		Vector polyChebCurr = v_r;
-//		Vector polyChebPrevPrev = v_r;
-//		Vector polyChebPrev = v_r;
-//
-//		gP[0] += v_r.transpose() * polyChebCurr;
-//
-//		//k = 1
-//		polyChebCurr = 2 * m_hessian * polyChebPrev;
-//		polyChebPrevPrev = polyChebPrev;
-//		polyChebPrev = polyChebCurr;
-//
-//		gP[1] += v_r.transpose() * polyChebCurr;
-//
-//		for (int k = 2; k < m_K; ++k)
-//		{
-//
-//			polyChebCurr = 2 * m_hessian * polyChebPrev - polyChebPrevPrev;
-//			polyChebPrevPrev = polyChebPrev;
-//			polyChebPrev = polyChebCurr;
-//
-//			gP[k] += v_r.transpose() * polyChebCurr;
-//		}
-//	}
-//	return gP;
-//}
+
 
 Vector KPM::getCoeffDOS()
 {
@@ -290,8 +374,8 @@ Vector KPM::getCoeffDOS()
 	for (int r = rank; r < m_R; r+=size)
 	{
 		if (r % 10 == 0)
-			cout<<float(r)/m_R*100<<"%"<<endl;
-		//k = 0
+			processRunningStatus(float(r)/m_R);
+
 		Vector v_r = normal(m_DOF);
 		v_r=v_r/v_r.norm();
 		Vector polyChebCurr = v_r;
@@ -317,7 +401,59 @@ Vector KPM::getCoeffDOS()
 			loc_gP[k] += v_r.transpose() * polyChebCurr;
 		}
 	}
-	//MPI::COMM_WORLD.Reduce(loc_gP.array(), glob_gP.array(), m_K, MPI::DOUBLE, MPI::SUM, 0);
+	processEnded();
+	MPI::COMM_WORLD.Reduce(loc_gP.data(), glob_gP.data(), m_K, MPI::DOUBLE, MPI::SUM, 0);
+	return glob_gP;
+}
+
+Vector KPM::getCoeffGammaDOS()
+{
+	Vector loc_gP = zeros(m_K); // gauss projection
+	Vector glob_gP = zeros(m_K); // gauss projection
+//	cout<<m_af.transpose()<<endl;
+//	write("afGDOS.dat", m_af);
+//	cout<<m_MinvSqrt.transpose()<<endl;
+//	write("m_MinvSqrt.dat", m_MinvSqrt);
+	int rank = MPI::COMM_WORLD.Get_rank();
+	int size = MPI::COMM_WORLD.Get_size();
+	for (int r = rank; r < m_R; r+=size)
+	{
+		if (r % 100 == 0)
+		{
+			processRunningStatus(float(r)/m_R);
+			if(rank == 0)
+				write("gPgamma_" +to_string(r) +".dat",loc_gP);
+		}
+
+		Vector v_r = normal(m_DOF);
+		v_r=v_r/v_r.norm();
+
+		double mLeft = m_af.dot(v_r);
+
+		Vector polyChebCurr = v_r;
+		Vector polyChebPrevPrev = v_r;
+		Vector polyChebPrev = v_r;
+
+		loc_gP[0] += mLeft * mLeft;
+
+		//k = 1
+		polyChebCurr = 2 * m_hessian * polyChebPrev;
+		polyChebPrevPrev = polyChebPrev;
+		polyChebPrev = polyChebCurr;
+
+		loc_gP[1] += mLeft * m_af.dot( polyChebCurr);
+
+		for (int k = 2; k < m_K; ++k)
+		{
+
+			polyChebCurr = 2 * m_hessian * polyChebPrev - polyChebPrevPrev;
+			polyChebPrevPrev = polyChebPrev;
+			polyChebPrev = polyChebCurr;
+
+			loc_gP[k] += mLeft * m_af.dot( polyChebCurr);
+		}
+	}
+	processEnded();
 	MPI::COMM_WORLD.Reduce(loc_gP.data(), glob_gP.data(), m_K, MPI::DOUBLE, MPI::SUM, 0);
 	return glob_gP;
 }
