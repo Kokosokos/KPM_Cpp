@@ -2,4 +2,4 @@ core
 /Release/**
 /ReleaseMPI/**
 /Debug/**
-*.dat
+/*.dat
