@@ -237,23 +237,7 @@ void KPM::readCSR()
 	// Reserving enough space for non-zero elements
 
 
-#ifndef EIGEN
-	m_hessian.reserve( m_nnonzero );
-	for (unsigned int i =0; i < N ;++i)
-	{
-		rowLen = indptr[i+1] - indptr[i];
 
-
-		for (int j =0;j <rowLen;++j)
-		{
-			int k = indptr[i] + j;
-			m_hessian.append( i, indices[k]-1, data[k] );
-		}
-
-		m_hessian.finalize( i );
-	}
-	cout<<"Hessian's first element: "<<m_hessian(1,1)<<endl;
-#else
 	vector<int> sizes(N);
 	for (unsigned int i =0; i < N ;++i)
 	{
@@ -274,7 +258,6 @@ void KPM::readCSR()
 	//	m_hessian.makeCompressed();
 	//get 1 element
 	//	cout<<m_hessian.coeff(1,1);
-#endif
 
 }
 
@@ -474,3 +457,26 @@ Vector KPM::sumSeries(const Vector& freq, const Vector& gP)
 	}
 	return sumKPM;
 }
+
+//Vector gp_gpp(n_bins_0, bin_min, bin_max, GA, GammaDos, nu, Volume, N):
+//    n_bins = int(n_bins_0);
+//    bin_width = (bin_max - bin_min) / n_bins
+//    # print bin_min
+//
+//    Gp = np.zeros(shape=(n_bins, 2))
+//    Gpp = np.zeros(shape=(n_bins, 2))
+//
+//    E = np.sign(GammaDos[0]) * (GammaDos[0]) ** 2
+//    # E = (GammaDos[0]) ** 2
+//    for i in range(n_bins):
+//        freq = 10.0 ** (bin_min + i * bin_width)
+//        Ediff = (E - freq ** 2)
+//        denom = (Ediff ** 2 + (nu * freq) ** 2) * Volume / 3.0 / N
+//
+//        Gp[i][1] = GA - np.trapz(GammaDos[1] * Ediff / denom, GammaDos[0])
+//        Gpp[i][1] = np.trapz(GammaDos[1] * freq * nu / denom, GammaDos[0])
+//        Gp[i][0] = freq
+//        Gpp[i][0] = freq
+//
+//    return Gp, Gpp
+

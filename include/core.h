@@ -14,17 +14,7 @@
 
 const double c_PI=3.14159;
 
-#ifndef EIGEN
-#include <blaze/Blaze.h>
-#include <blaze/math/CompressedMatrix.h>
-#include <blaze/math/DynamicVector.h>
-#include <blaze/math/DynamicMatrix.h>
 
-//// Definition of a 4x6 single precision row-major matrix
-typedef blaze::CompressedMatrix<float,blaze::rowMajor> sMatrix;
-typedef blaze::DynamicVector<float,blaze::rowMajor> Vector;
-
-#else
 #include <Eigen/Sparse>
 
 const   Eigen::StorageOptions c_myStorageOrder =  Eigen::RowMajor;
@@ -181,7 +171,6 @@ inline void processEnded()
 	 std::cout<<std::endl;
 	 std::cout.flush();
 }
-#endif
 
 #include "mpi.h"
 
