@@ -188,7 +188,7 @@ int main(int argc, char* argv[])
 //			fnindices = vm["csr"].as<vector<string>>()[1];
 //			fnindptr  = vm["csr"].as<vector<string>>()[2];
 
-			cout<<"CSR files: "<<csrFiles[0]<< " "<<  csrFiles[1]<<" c"<<csrFiles[2]<<endl;
+			cout<<"CSR files: "<<csrFiles[0]<< " "<<  csrFiles[1]<<" "<<csrFiles[2]<<endl;
 		}
 		else
 		{
@@ -234,7 +234,7 @@ int main(int argc, char* argv[])
 		kpm.readLAMMPSData(mfile);
 
 	kpm.HTilde();
-	kpm.readAF("test/dF.csv");
+
 
 
 	//	Vector gp = kpm.getCoeffDOS();
@@ -252,6 +252,7 @@ int main(int argc, char* argv[])
 		gp = kpm.getCoeffGammaDOS();
 		gpFile = "gpGammaDOS.dat";
 		resFile = "GammaDOS.dat";
+		kpm.readAF(affile);
 	}
 	if(rank == 0)
 	{
