@@ -25,19 +25,24 @@ using namespace Spectra;
 
 KPM::KPM(): m_R(100), m_nuEdge(0.05)  {
 	setK(100);
-	m_fndata	= "test/H.data.dat";
-	m_fnindptr	= "test/H.indptr.dat";
-	m_fnindices	= "test/H.indices.dat";
+//	m_fndata	= "test/H.data.dat";
+//	m_fnindptr	= "test/H.indptr.dat";
+//	m_fnindices	= "test/H.indices.dat";
 
 	readCSR();
 
 }
 
-KPM::KPM(unsigned int K, unsigned int R, float nuEdge): m_R(R), m_nuEdge(nuEdge)
+KPM::KPM(vector<string> csrFiles,  unsigned int K, unsigned int R, float nuEdge): m_R(R), m_nuEdge(nuEdge)
 {
-	m_fndata	= "test/H.data.dat";
-	m_fnindptr	= "test/H.indptr.dat";
-	m_fnindices	= "test/H.indices.dat";
+//	m_fndata	= "test/H.data.dat";
+//	m_fnindptr	= "test/H.indptr.dat";
+//	m_fnindices	= "test/H.indices.dat";
+
+	m_fndata = csrFiles[0];
+	m_fnindices = csrFiles[1];
+	m_fnindptr = csrFiles[2];
+
 	setK(K);
 	readCSR();
 
@@ -88,6 +93,13 @@ void  KPM::readAF(string filename)
 	m_af = m_af.cwiseProduct(m_MinvSqrt);
 	//	m_af = my_vect;
 }
+
+void KPM::constMass(float m)
+{
+	m_MinvSqrt = 1.0 / sqrt(m) * ones(m_DOF);
+//	m_MinvSqrt = Vector::Map(massesFull.data(), massesFull.size());
+}
+
 void KPM::readLAMMPSData(string filename)
 {
 	unsigned int curLine = 0;

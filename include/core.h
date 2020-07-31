@@ -41,7 +41,7 @@ inline  Vector arange(int N)
 
 inline  Vector arange(int N, float min, float max)
 {
-	return Vector::LinSpaced(N,0,max);
+	return Vector::LinSpaced(N,min,max);
 }
 
 inline  Vector sin(Vector v)

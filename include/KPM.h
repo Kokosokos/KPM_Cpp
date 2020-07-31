@@ -25,8 +25,11 @@ public:
 	void write(string filename, Vector v1, Vector v2);
 	void write(string filename, Vector v1);
 	void  readAF(string filename);
-	void readLAMMPSData(string filename); //reads m_M (particle masses) from lammps data file
 
+	//read mass file
+	void readLAMMPSData(string filename); //reads m_M (particle masses) from lammps data file
+	//or fill mass matrix with const values
+	void constMass(float m);
 	//-----------------------------------------
 
 
@@ -46,7 +49,7 @@ public:
 	void setR(unsigned int R);
 
 	KPM();
-	KPM(unsigned int K, unsigned int R, float nuEdge = 0.05);
+	KPM(vector<string> csrFiles, unsigned int K, unsigned int R, float nuEdge = 0.05);
 	virtual ~KPM();
 
 	double aScaling();

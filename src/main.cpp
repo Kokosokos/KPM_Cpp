@@ -75,38 +75,49 @@ int main(int argc, char* argv[])
 	string resFile;
 	string mfile;
 
-	float m;
+	float m = 1.0;
+	bool mconst = true;
 
 	int kpmmode = 0; // 0 = dos; 1 - gdos;
 
-	string fndata;
-	string fnindptr;
-	string fnindices;
+//	string fndata;
+//	string fnindptr;
+//	string fnindices;
+	vector<string> csrFiles;
+
+	//Reading arguments
+
+	//------------------------------------------------------------------------------------
+	options_description all{"Options"};
+	options_description necessary{"Necessary"};
+	options_description optional{"Optional"};
+	options_description gdos{"GammaDOS(--gdos) specific"};
 	try
 	{
-		options_description desc{"Options"};
+
 //		namespace po = boost::program_options;
-		desc.add_options()
+		necessary.add_options()
 	    	  ("help,h", "Help screen")
-			  ("csr", value<vector<string>>()->multitoken(), "Input CSR fromatted matrix. data, indices and indptr filenames.")
+			  ("csr", value<vector<string>>(&csrFiles)->multitoken()->required(), "Input CSR fromatted matrix. data, indices and indptr filenames.")
+			  ("mode", value<string>()->required(), "set mode: dos or gdos");
+		optional.add_options()
 			  ("K", value<int>()->default_value(1000), "Set the maximum polynomial  order")
 			  ("R", value<int>()->default_value(20), "Set the number of random vectors")
-			  ("emin", value<float>(), "Set the minimum eigenvalue")
+			  ("emin", value<float>(), "Set the minimum eigenvalue (if not set we'll calculate it for you)")
 			  ("emax", value<float>(), "Set the maximum eigenvalue")
-//			  ("mode", po::value<mode>(), "set mode: dos or gdos")
-			  ("mode", value<string>(), "set mode: dos or gdos")
-			  ("af", value<string>(), "affine force filename, needed for gdos calculation")
 			  ("mfile", value<string>(), "lammps data file to read masses")
 			  ("m", value<float>(), "constant mass value");
-
+		gdos.add_options()
+			  ("af", value<string>(), "affine force filename");
+		all.add(necessary).add(optional).add(gdos);
 		variables_map vm;
-		store(parse_command_line(argc, argv, desc), vm);
-		notify(vm);
 
+		store(parse_command_line(argc, argv, all), vm);
+		notify(vm);
 		if (vm.count("help") || argc == 1)
 		{
 			argc = 1;
-			std::cout << desc << '\n';
+			std::cout << all << '\n';
 			return 0;
 		}
 
@@ -141,9 +152,15 @@ int main(int argc, char* argv[])
 				{
 					affile = vm["af"].as<string>();
 					if(vm.count("mfile"))
+					{
 						mfile = vm["mfile"].as<string>();
+						mconst = false;
+					}
 					else
+					{
 						m = vm["m"].as<float>();
+						mconst = true;
+					}
 
 				}
 				else
@@ -165,17 +182,17 @@ int main(int argc, char* argv[])
 			return 0;
 		}
 
-		if( vm.count("csr") == 3 )
+		if( csrFiles.size() == 3 )
 		{
-			fndata    = vm["csr"].as<vector<string>>()[0];
-			fnindices = vm["csr"].as<vector<string>>()[1];
-			fnindptr  = vm["csr"].as<vector<string>>()[2];
+//			fndata    = vm["csr"].as<vector<string>>()[0];
+//			fnindices = vm["csr"].as<vector<string>>()[1];
+//			fnindptr  = vm["csr"].as<vector<string>>()[2];
 
-			cout<<fndata<< " "<<  fnindptr<<endl;
+			cout<<"CSR files: "<<csrFiles[0]<< " "<<  csrFiles[1]<<" c"<<csrFiles[2]<<endl;
 		}
 		else
 		{
-			cout << "Error: Please provide 3 files when using --csr: data, indices and indptr"<<endl;
+			cout << "Error: Please provide 3 files when using --csr: data, indices and indptr."<<endl;
 			return 0;
 		}
 
@@ -183,14 +200,20 @@ int main(int argc, char* argv[])
 	catch (const error &ex)
 	{
 		std::cerr << ex.what() << '\n';
+		std::cout << all << '\n';
+		return 0;
 	}
+	//------------------------------------------------------------------------------------
 
+
+	//KPM START
+	//------------------------------------------------------------------------------------
 	int rank = MPI::COMM_WORLD.Get_rank();
 	//	Eigen::setNbThreads(4);
 	clock_t t;
 	t = clock();
 
-	KPM kpm( K, R );
+	KPM kpm( csrFiles, K, R );
 
 	if(find_eminmax)
 	{
@@ -205,7 +228,10 @@ int main(int argc, char* argv[])
 		kpm.m_emax = emax;
 	}
 
-	kpm.readLAMMPSData("test/a_data.file");
+	if(mconst)
+		kpm.constMass(m);
+	else
+		kpm.readLAMMPSData(mfile);
 
 	kpm.HTilde();
 	kpm.readAF("test/dF.csv");
