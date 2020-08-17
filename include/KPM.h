@@ -10,7 +10,7 @@
 #include <iostream>
 #include <stdio.h>
 #include "core.h"
-
+#include "FileManager.h"
 
 using namespace std;
 
@@ -21,14 +21,7 @@ public:
 	/**
 	 * @brief Reads the CSR-matrix from 3 files: m_fndata, m_fnindptr, m_fnindptr
 	 */
-	void readCSR();
-	void write(string filename, Vector v1, Vector v2);
-	void write(string filename, Vector v1);
-	void  readAF(string filename);
-
-	//read mass file
-	void readLAMMPSData(string filename); //reads m_M (particle masses) from lammps data file
-	//or fill mass matrix with const values
+	void setMassVectorInvSqrt( const Vector& mInvSqrt);
 	void constMass(float m);
 	//-----------------------------------------
 
@@ -41,53 +34,54 @@ public:
 	 * @brief Finds maximum eigenvalue.
 	 */
 	void findEmax();
+	/**
+	 * @brief Set minimum eigenvalue.
+	 */
+	void setEmin( const float& emin);
+	/**
+	 * @brief Set maximum eigenvalue.
+	 */
+	void setEmax( const float& emax);
+
+
+	float getEmin() const;
+	float getEmax() const;
 
 	/**
 	 * @brief Sets maximum polynomial degree. Invokes @jacksonKernel(K)@ to recalculate jackson kernel.
 	 */
 	void setK(unsigned int K);
 	void setR(unsigned int R);
+	int getK();
+	int getR();
 
-	KPM();
-	KPM(vector<string> csrFiles, unsigned int K, unsigned int R, float nuEdge = 0.05);
+	void setAF(const Vector& af);
+
+//	KPM(); add hessian set flag??
+	KPM(const sMatrix& hessian, unsigned int K, unsigned int R, float nuEdge = 0.05);
 	virtual ~KPM();
 
-	double aScaling();
-	double bScaling();
-	void ETilde(Vector& e);
-	void HTilde();
 
-	void jacksonKernel(int K);
 
 	Vector getCoeffDOS();
 	Vector getCoeffGammaDOS();
 	Vector sumSeries(const Vector& freq, const Vector& gP);
 
+	Vector getModulus(const float& GA,  const float& volume, const Vector& gdos_freq, const Vector& gdos, const Vector& freq );
+
+	void HTilde();
+
+	private:
+
+	double aScaling();
+	double bScaling();
+	void ETilde(Vector& e);
 
 
-	//private:
+	void jacksonKernel(int K);
 	//INPUT filenames
 	//-----------------------------------------
 
-	/**
-	 * @brief Filename of the data of the CSR-matrix.
-	 */
-	string m_fndata;
-	/**
-	 * @brief Filename of the indptr of the CSR-matrix.
-	 * "indptr" shows the cumulative number of non zero elements in each row.,
-	 */
-	string m_fnindptr;
-	/**
-	 * @brief Filename of the indices of the CSR-matrix.
-	 * "indices" shows the column index of all non zero elements.
-	 */
-	string m_fnindices;
-
-	/**
-	 * @brief Filename of the affine force field vector. (Needed for GammaDOS and G'(G'') calculations. Not needed for VDOS only.)
-	 */
-	string m_faf;
 	//-----------------------------------------
 
 	/**
@@ -122,7 +116,7 @@ public:
 	/**
 	 * @brief MAximum eigenvalue
 	 */
-	int m_emax;
+	double m_emax;
 
 
 	/**

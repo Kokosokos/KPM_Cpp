@@ -23,254 +23,33 @@
 using namespace Spectra;
 
 
-KPM::KPM(): m_R(100), m_nuEdge(0.05)  {
-	setK(100);
-//	m_fndata	= "test/H.data.dat";
-//	m_fnindptr	= "test/H.indptr.dat";
-//	m_fnindices	= "test/H.indices.dat";
+//KPM::KPM(): m_R(100), m_nuEdge(0.05)
+//{
+//	setK(100);
+//	readCSR();
+//}
 
-	readCSR();
-
-}
-
-KPM::KPM(vector<string> csrFiles,  unsigned int K, unsigned int R, float nuEdge): m_R(R), m_nuEdge(nuEdge)
+KPM::KPM(const sMatrix& hessian,  unsigned int K, unsigned int R, float nuEdge): m_R(R), m_nuEdge(nuEdge)
 {
-//	m_fndata	= "test/H.data.dat";
-//	m_fnindptr	= "test/H.indptr.dat";
-//	m_fnindices	= "test/H.indices.dat";
-
-	m_fndata = csrFiles[0];
-	m_fnindices = csrFiles[1];
-	m_fnindptr = csrFiles[2];
-
 	setK(K);
-	readCSR();
-
+	m_hessian = hessian;
+	m_DOF = m_hessian.cols();
 }
 
 
 KPM::~KPM() {
 	// TODO Auto-generated destructor stub
 }
-void KPM::write(string filename, Vector v1, Vector v2)
-{
-	FILE *stream;
-	stream = fopen(filename.c_str(), "w");
-	for(int i = 0; i< v1.size(); ++i )
-	{
-		fprintf(stream, "%f %f\n", v1[i], v2[i]);
-	}
-	fclose(stream);
-}
 
-void KPM::write(string filename, Vector v1)
-{
-	FILE *stream;
-	stream = fopen(filename.c_str(), "w");
-	for(int i = 0; i< v1.size(); ++i )
-	{
-		fprintf(stream, "%f\n", v1[i]);
-	}
-	fclose(stream);
-}
-
-void  KPM::readAF(string filename)
-{
-	m_faf = filename;
-	FILE *stream;
-	stream = fopen(filename.c_str(), "r");
-	if (stream==NULL) perror ("Error opening file for AF");
-	float val = 0.0f;
-	vector<double> v;
-	while(fscanf(stream, "%f", &val) != EOF)
-	{
-		v.push_back(val);
-	}
-	fclose(stream);
-	//	m_af = Vector(v.data());
-	//	double* ptr = &v[0];
-	m_af = Vector::Map(v.data(), v.size());
-	m_af = m_af.cwiseProduct(m_MinvSqrt);
-	//	m_af = my_vect;
-}
 
 void KPM::constMass(float m)
 {
 	m_MinvSqrt = 1.0 / sqrt(m) * ones(m_DOF);
 //	m_MinvSqrt = Vector::Map(massesFull.data(), massesFull.size());
 }
-
-void KPM::readLAMMPSData(string filename)
+void KPM::setMassVectorInvSqrt( const Vector& mInvSqrt)
 {
-	unsigned int curLine = 0;
-
-
-	std::ifstream fileInput;
-	string line;
-	fileInput.open(filename.c_str());
-
-
-	//Search for N atoms
-	//	string search = "atoms";
-	int nM = 0;
-	int N=0; // number of atoms
-	vector<double> masses;
-	vector<int> massIds;
-	vector<double> massesFull;
-	while(getline(fileInput, line))
-	{
-		curLine++;
-
-		if (line.find("atoms", 0) != string::npos)
-		{
-			std::istringstream iss(line);
-
-			std::vector<std::string> results((std::istream_iterator<std::string>(iss)),
-					std::istream_iterator<std::string>());
-			iss =  std::istringstream(results[0]);
-			iss >> N;
-		}
-
-		if (line.find("atom types", 0) != string::npos)
-		{
-			std::istringstream iss(line);
-
-			std::vector<std::string> results((std::istream_iterator<std::string>(iss)),
-					std::istream_iterator<std::string>());
-
-			iss =  std::istringstream(results[0]);
-			iss >> nM;
-		}
-
-
-		if (line.find("Masses", 0) != string::npos)
-		{
-			getline(fileInput, line);
-			float m=0.0f;
-			for (int i =0; i < nM; ++i)
-			{
-				getline(fileInput, line);
-				std::istringstream iss(line);
-
-				std::vector<std::string> results((std::istream_iterator<std::string>(iss)),
-						std::istream_iterator<std::string>());
-
-				iss =  std::istringstream(results[1]);
-				iss>>m;
-				masses.push_back(m);
-			}
-
-		}
-
-		if (line.find("Atoms", 0) != string::npos)
-		{
-			getline(fileInput, line);
-
-			int mid=0;
-			for (int i =0; i < N; ++i)
-			{
-				getline(fileInput, line);
-				std::istringstream iss(line);
-
-				std::vector<std::string> results((std::istream_iterator<std::string>(iss)),
-						std::istream_iterator<std::string>());
-
-				iss =  std::istringstream(results[2]);
-				iss>>mid;
-				massIds.push_back(mid);
-
-				//Dimensionality == 3
-				double minvsqrt = 1.0 / sqrt(masses[mid-1]);
-				massesFull.push_back(minvsqrt);
-				massesFull.push_back(minvsqrt);
-				massesFull.push_back(minvsqrt);
-			}
-			break;
-		}
-	}
-//	m_M = Vector::Map(massesFull.data(), massesFull.size());
-	m_MinvSqrt = Vector::Map(massesFull.data(), massesFull.size());
-	//Search for masses values
-
-
-	fileInput.close();
-}
-
-void KPM::readCSR()
-{
-
-	//Read indptr from CSR matrix (== cumulative number of nonzero elements in a row)
-	//	vector<int> T(100000, 22);
-	vector<int> indptr;
-	FILE *stream;
-	stream = fopen(m_fnindptr.c_str(), "r");
-	if (stream==NULL) perror ("Error opening file for indptr");
-
-	int val;
-	while(fscanf(stream, "%d", &val) != EOF)
-	{
-		indptr.push_back(val);
-	}
-	fclose(stream);
-	unsigned int N=indptr.size()-1;
-	//	cout<<"N:"<<N<<endl;
-
-	m_DOF = N;
-
-	//Read data and column indices
-	int nNon0 = *(indptr.end()-1); //number of non zero elements
-
-	FILE *stream3;
-	stream3 = fopen(m_fndata.c_str(), "r");
-	float dataval=0.0f;
-	vector <float> data;
-	for (int i =0; i < nNon0;++i)
-	{
-		if(fscanf(stream3, "%f", &dataval) == EOF)  perror ("Error: datafile has too few elements");
-		data.push_back(dataval);
-	}
-	fclose(stream3);
-
-	FILE *stream2;
-	stream2 = fopen(m_fnindices.c_str(), "r");
-	int indval=0;
-	vector <int> indices;
-	for (int i =0; i < nNon0;++i)
-	{
-		if(fscanf(stream, "%d", &indval) == EOF)  perror ("Error: datafile has too few elements");
-		indices.push_back(indval);
-	}
-	fclose(stream2);
-	int rowLen = 0;
-	m_nnonzero = indptr[N];
-
-	//Create sparse matrix
-	m_hessian = sMatrix(N,N);
-	// Reserving enough space for non-zero elements
-
-
-
-	vector<int> sizes(N);
-	for (unsigned int i =0; i < N ;++i)
-	{
-		sizes[i]=indptr[i+1] - indptr[i];
-	}
-	m_hessian.reserve( sizes );
-	for (unsigned int i =0; i < N ;++i)
-	{
-		rowLen = indptr[i+1] - indptr[i];
-
-
-		for (int j =0;j <rowLen;++j)
-		{
-			int k = indptr[i] + j;
-			m_hessian.insert( i, indices[k]-1) =  data[k] ;
-		}
-	}
-	//	m_hessian.makeCompressed();
-	//get 1 element
-	//	cout<<m_hessian.coeff(1,1);
-
+	m_MinvSqrt = mInvSqrt;
 }
 
 void KPM::findEmin()
@@ -310,6 +89,25 @@ void KPM::findEmax()
 	m_emax = evalues[0].real();
 }
 
+void KPM::setEmin( const float& emin)
+{
+	m_emin = emin;
+}
+
+void KPM::setEmax( const float& emax)
+{
+	m_emax = emax;
+}
+
+float KPM::getEmin() const
+{
+	return m_emin;
+}
+float KPM::getEmax() const
+{
+	return m_emax;
+}
+
 void KPM::setK(unsigned int K)
 {
 	m_K = K;
@@ -319,6 +117,21 @@ void KPM::setK(unsigned int K)
 void KPM::setR(unsigned int R)
 {
 	m_R = R;
+}
+
+int KPM::getK()
+{
+	return m_K;
+}
+int KPM::getR()
+{
+	return m_R;
+}
+
+void KPM::setAF(const Vector& af)
+{
+	//check if scaled??/
+	m_af = m_MinvSqrt.cwiseProduct( af );
 }
 
 //Rescaling to ~[-1,1] routines
@@ -333,6 +146,8 @@ double KPM::bScaling()
 }
 void KPM::ETilde(Vector& e)
 {
+	if(e.maxCoeff() > m_emax || e.minCoeff() < m_emin)
+		std::cout << "WARNING: Requested output frequencies are not in range of [emin,emax].\n";
 	const double a(aScaling());
 	const double  b(bScaling());
 
@@ -366,6 +181,7 @@ Vector KPM::getCoeffDOS()
 	Vector glob_gP = zeros(m_K); // gauss projection
 	int rank = MPI::COMM_WORLD.Get_rank();
 	int size = MPI::COMM_WORLD.Get_size();
+
 	for (int r = rank; r < m_R; r+=size)
 	{
 		if (r % 10 == 0)
@@ -390,10 +206,11 @@ Vector KPM::getCoeffDOS()
 		{
 
 			polyChebCurr = 2 * m_hessian * polyChebPrev - polyChebPrevPrev;
+			loc_gP[k] += v_r.transpose() * polyChebCurr;
 			polyChebPrevPrev = polyChebPrev;
 			polyChebPrev = polyChebCurr;
 
-			loc_gP[k] += v_r.transpose() * polyChebCurr;
+
 		}
 	}
 	processEnded();
@@ -403,25 +220,26 @@ Vector KPM::getCoeffDOS()
 
 Vector KPM::getCoeffGammaDOS()
 {
+	FileManager fmanager;
 	Vector loc_gP = zeros(m_K); // gauss projection
 	Vector glob_gP = zeros(m_K); // gauss projection
-//	cout<<m_af.transpose()<<endl;
-//	write("afGDOS.dat", m_af);
-//	cout<<m_MinvSqrt.transpose()<<endl;
-//	write("m_MinvSqrt.dat", m_MinvSqrt);
+
 	int rank = MPI::COMM_WORLD.Get_rank();
 	int size = MPI::COMM_WORLD.Get_size();
+	cout <<"MPI size:"<< size<<endl;
 	for (int r = rank; r < m_R; r+=size)
 	{
 		if (r % 100 == 0)
 		{
 			processRunningStatus(float(r)/m_R);
 			if(rank == 0)
-				write("gPgamma_" +to_string(r) +".dat",loc_gP);
+				fmanager.write("gPgamma_K"+to_string(m_K)+"_R" +to_string(int(r/size)) + ".dat",loc_gP);
 		}
 
 		Vector v_r = normal(m_DOF);
 		v_r=v_r/v_r.norm();
+		if(r < 8)
+			fmanager.write("u"+to_string(r)+"c"+to_string(size)+".dat", v_r);
 
 		double mLeft = m_af.dot(v_r);
 
@@ -432,8 +250,8 @@ Vector KPM::getCoeffGammaDOS()
 		loc_gP[0] += mLeft * mLeft;
 
 		//k = 1
-		polyChebCurr = 2 * m_hessian * polyChebPrev;
-		polyChebPrevPrev = polyChebPrev;
+		polyChebCurr = 2.0 * m_hessian * v_r ;
+		polyChebPrevPrev = v_r;
 		polyChebPrev = polyChebCurr;
 
 		loc_gP[1] += mLeft * m_af.dot( polyChebCurr);
@@ -441,7 +259,7 @@ Vector KPM::getCoeffGammaDOS()
 		for (int k = 2; k < m_K; ++k)
 		{
 
-			polyChebCurr = 2 * m_hessian * polyChebPrev - polyChebPrevPrev;
+			polyChebCurr = 2.0 * m_hessian * polyChebPrev  - polyChebPrevPrev;
 			polyChebPrevPrev = polyChebPrev;
 			polyChebPrev = polyChebCurr;
 
@@ -450,6 +268,7 @@ Vector KPM::getCoeffGammaDOS()
 	}
 	processEnded();
 	MPI::COMM_WORLD.Reduce(loc_gP.data(), glob_gP.data(), m_K, MPI::DOUBLE, MPI::SUM, 0);
+	cout<<"rank: "<<rank<<". loc: "<<loc_gP[0]<<". glob: "<<glob_gP[0]<<endl;
 	return glob_gP;
 }
 
@@ -468,6 +287,27 @@ Vector KPM::sumSeries(const Vector& freq, const Vector& gP)
 
 	}
 	return sumKPM;
+}
+
+Vector KPM::getModulus(const float& GA, const float& volume, const Vector& gdos_freq, const Vector& gdos, const Vector& freq )
+{
+	cout<<"Modulus calculation....\n GA: "<<GA<<"\tVolume: "<<volume<<endl;
+	float nu = 1.0;
+//	float volume = 571.0;
+//	float N = m_DOF/3.0;
+
+	Vector Gp = zeros(gdos_freq.size());
+	Vector e = sign(gdos_freq).cwiseProduct(sqr(gdos_freq));
+
+	int vsize = e.size();
+	for( int i = 0; i < freq.size();++i)
+	{
+			Vector ediff = e - ones(vsize) * freq[i] * freq[i];
+			Vector denom = ((sqr(ediff) + ones(vsize)*(nu * freq[i])*(nu * freq[i])) * volume / m_DOF).cwiseInverse();
+			Gp[i] = GA - trapz(gdos.cwiseProduct(ediff).cwiseProduct(denom), gdos_freq);
+ 	}
+
+	return Gp;
 }
 
 //Vector gp_gpp(n_bins_0, bin_min, bin_max, GA, GammaDos, nu, Volume, N):

@@ -9,9 +9,12 @@
 #include <iostream>
 #include <fstream>
 
+
 #include "KPM.h"
+
 //!!!! Implement ZERO FREQ SHEAR MODULUS output!!!
 //!
+//!!!! Separate Kernel into interface + jackson, lorentzz....implementations.
 //!
 using namespace std;
 
@@ -24,44 +27,27 @@ using namespace std;
 #include <boost/program_options.hpp>
 using namespace boost::program_options;
 
-//struct mode
-//{
-//	mode(std::string const& val):
-//		value(val)
-//	{ }
-//	std::string value;
-//};
-//
-//void validate(boost::any& v,
-//		std::vector<std::string> const& values,
-//		mode* target_type,
-//		int)
-//{
-//	using namespace boost::program_options;
-//
-//	// Make sure no previous assignment to 'v' was made.
-//	validators::check_first_occurrence(v);
-//
-//	// Extract the first string from 'values'. If there is more than
-//	// one string, it's an error, and exception will be thrown.
-//	std::string const& s = validators::get_single_string(values);
-//
-//	if (s == "dos" || s == "gdos")
-//	{
-//		v = boost::any(mode(s));
-//	}
-//	else
-//	{
-//		throw validation_error(validation_error::invalid_option_value);
-//	}
-//}
-
+#include <random>
+#include <map>
+#include <cmath>
+#include <iomanip>
 
 
 int main(int argc, char* argv[])
 {
 
 
+
+//	Vector v = normal(10000);
+//	std::map<int, int> hist{};
+//	for(int n=0; n<10000; ++n) {
+//		++hist[std::round(v[n])];
+//	}
+//	for(auto p : hist) {
+//		std::cout << std::setw(2)
+//		<< p.first << ' ' << std::string(p.second/100, '*') << '\n';
+//	}
+//	return 0;
 	MPI::Init(argc, argv);
 
 	int K = 1000;
@@ -80,11 +66,13 @@ int main(int argc, char* argv[])
 
 	int kpmmode = 0; // 0 = dos; 1 - gdos;
 
-//	string fndata;
-//	string fnindptr;
-//	string fnindices;
+	//	string fndata;
+	//	string fnindptr;
+	//	string fnindices;
 	vector<string> csrFiles;
-
+	vector<string> gpFiles;
+	bool justGp = false;
+	FileManager fmanager;
 	//Reading arguments
 
 	//------------------------------------------------------------------------------------
@@ -95,20 +83,21 @@ int main(int argc, char* argv[])
 	try
 	{
 
-//		namespace po = boost::program_options;
+		//		namespace po = boost::program_options;
 		necessary.add_options()
-	    	  ("help,h", "Help screen")
-			  ("csr", value<vector<string>>(&csrFiles)->multitoken()->required(), "Input CSR fromatted matrix. data, indices and indptr filenames.")
-			  ("mode", value<string>()->required(), "set mode: dos or gdos");
+	    			  ("help,h", "Help screen")
+					  ("csr", value<vector<string>>(&csrFiles)->multitoken()->required(), "Input CSR fromatted matrix. data, indices and indptr filenames.")
+					  ("mode", value<string>()->required(), "set mode: dos or gdos");
 		optional.add_options()
-			  ("K", value<int>()->default_value(1000), "Set the maximum polynomial  order")
-			  ("R", value<int>()->default_value(20), "Set the number of random vectors")
-			  ("emin", value<float>(), "Set the minimum eigenvalue (if not set we'll calculate it for you)")
-			  ("emax", value<float>(), "Set the maximum eigenvalue")
-			  ("mfile", value<string>(), "lammps data file to read masses")
-			  ("m", value<float>(), "constant mass value");
+					  ("K", value<int>()->default_value(1000), "Set the maximum polynomial  order")
+					  ("R", value<int>()->default_value(20), "Set the number of random vectors")
+					  ("emin", value<float>(&emin), "Set the minimum eigenvalue (if not set we'll calculate it for you)")
+					  ("emax", value<float>(&emax), "Set the maximum eigenvalue")
+					  ("mfile", value<string>(), "lammps data file to read masses")
+					  ("m", value<float>(), "constant mass value");
 		gdos.add_options()
-			  ("af", value<string>(), "affine force filename");
+					  ("af", value<string>(), "affine force filename")
+					  ("gp", value<vector<string>>(&gpFiles)->multitoken(), "gauss projection files (skip calculation and just sum)");
 		all.add(necessary).add(optional).add(gdos);
 		variables_map vm;
 
@@ -135,8 +124,8 @@ int main(int argc, char* argv[])
 
 		if (vm.count("emin") && vm.count("emax"))
 		{
-			emin = vm["emin"].as<float>();
-			emax = vm["emax"].as<float>();
+//			emin = vm["emin"].as<float>();
+//			emax = vm["emax"].as<float>();
 			find_eminmax = false;
 
 		}
@@ -168,6 +157,9 @@ int main(int argc, char* argv[])
 					cout << "Error: please provide  affine force file(--af) and lammps data file (--mfile or --m for constant mass) for gammaDOS calculation."<<endl;
 					return 0;
 				}
+
+				if(vm.count("gp"))
+					justGp = true;
 			}
 			else
 			{
@@ -184,9 +176,9 @@ int main(int argc, char* argv[])
 
 		if( csrFiles.size() == 3 )
 		{
-//			fndata    = vm["csr"].as<vector<string>>()[0];
-//			fnindices = vm["csr"].as<vector<string>>()[1];
-//			fnindptr  = vm["csr"].as<vector<string>>()[2];
+			//			fndata    = vm["csr"].as<vector<string>>()[0];
+			//			fnindices = vm["csr"].as<vector<string>>()[1];
+			//			fnindptr  = vm["csr"].as<vector<string>>()[2];
 
 			cout<<"CSR files: "<<csrFiles[0]<< " "<<  csrFiles[1]<<" "<<csrFiles[2]<<endl;
 		}
@@ -212,26 +204,37 @@ int main(int argc, char* argv[])
 	//	Eigen::setNbThreads(4);
 	clock_t t;
 	t = clock();
-
-	KPM kpm( csrFiles, K, R );
+	sMatrix hessian;
+	fmanager.readCSR(csrFiles[0], csrFiles[1], csrFiles[2], hessian);
+	KPM kpm( hessian, K, R );
 
 	if(find_eminmax)
 	{
 		//if rank ==0; all the rest wait and then broadcast?
 		kpm.findEmin();
 		kpm.findEmax();
-		cout << "Emin Emax calculation: "<<kpm.m_emin<<"   "<<kpm.m_emax<<endl;
+		emin = kpm.getEmin();
+		emax = kpm.getEmax();
+		if(rank == 0)
+			cout << "Emin Emax calculated: "<<emin<<"   "<<emax<<endl;
 	}
 	else
 	{
-		kpm.m_emin = emin;
-		kpm.m_emax = emax;
+		kpm.setEmin( emin );
+		kpm.setEmax( emax );
+		if(rank == 0)
+				cout << "Emin Emax has been set: "<<emin<<"   "<<emax<<endl;
 	}
 
+	float Volume =0.0f;
 	if(mconst)
 		kpm.constMass(m);
 	else
-		kpm.readLAMMPSData(mfile);
+	{
+		Vector minvSqrt;
+		Volume = fmanager.readLAMMPSData(mfile, minvSqrt);
+		kpm.setMassVectorInvSqrt(minvSqrt);
+	}
 
 	kpm.HTilde();
 
@@ -240,7 +243,7 @@ int main(int argc, char* argv[])
 	//	Vector gp = kpm.getCoeffDOS();
 	kpm.setR(R);
 
-	Vector gp;
+	Vector gp  = zeros(kpm.getK());
 	if(!kpmmode)
 	{
 		gp = kpm.getCoeffDOS();
@@ -249,30 +252,55 @@ int main(int argc, char* argv[])
 	}
 	else
 	{
-		gp = kpm.getCoeffGammaDOS();
+		Vector af;
+		fmanager.readAF(affile, af);
+		kpm.setAF(af);
+		if(rank == 0)
+			cout << "gdos mode:"<<endl;
 		gpFile = "gpGammaDOS.dat";
 		resFile = "GammaDOS.dat";
-		kpm.readAF(affile);
+		if(!justGp)
+		{
+			gp = kpm.getCoeffGammaDOS();
+		}
+		else
+		{
+
+			for (int i =0; i< gpFiles.size(); ++i)
+			{
+				Vector locgp = zeros(kpm.getK());
+				fmanager.read(gpFiles[i], locgp);
+				gp += locgp;
+			}
+		}
+
 	}
+
 	if(rank == 0)
 	{
-		Vector freq = arange(400, sgn(kpm.m_emin)*sqrt(fabs(kpm.m_emin)), sqrt(kpm.m_emax));
+
+		Vector freq = arange(4000, sgn(emin)*sqrt(fabs(emin)), sqrt(emax));
 		//		Vector dos = kpm.sumSeries(freq, gp);
 		Vector res = kpm.sumSeries(freq, gp);
 		//		kpm.write("gP.dat",gp);
 		//		kpm.write("DOS.dat",freq, dos);
 
-		kpm.write(gpFile,gp);
-		kpm.write(resFile,freq, res);
+		fmanager.write(gpFile,gp);
+		fmanager.write(resFile,freq, res);
 		t = clock() - t;
 
 		printf ("It took me %d clicks (%f seconds).\n",(int) t,((float)t)/CLOCKS_PER_SEC);
 		FILE *stream;
 		stream = fopen("time.dat", "a");
 		fprintf(stream, "%d %d %d %f\n", K, R, (int) t, ((float)t)/CLOCKS_PER_SEC);
+
+		if(kpmmode)
+		{
+			Vector logfreq = logspace(100, 0.01,1000);
+			Vector Gp = kpm.getModulus(97.0, Volume, freq, res, logfreq );
+			fmanager.write("Gp.dat",logfreq, Gp);
+		}
 	}
-
-
 
 
 	MPI::Finalize();
