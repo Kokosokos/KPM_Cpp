@@ -256,7 +256,7 @@ void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 	vector <float> data;
 	for (int i =0; i < nNon0;++i)
 	{
-		if(fscanf(stream3, "%f", &dataval) == EOF)  perror ("Error: datafile has too few elements");
+		if(fscanf(stream3, "%f", &dataval) == EOF)  perror (("Error: datafile["+ fdata +"] has too few elements").c_str());
 		data.push_back(dataval);
 	}
 	fclose(stream3);
@@ -267,7 +267,7 @@ void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 	vector <int> indices;
 	for (int i =0; i < nNon0;++i)
 	{
-		if(fscanf(stream, "%d", &indval) == EOF)  perror ("Error: datafile has too few elements");
+		if(fscanf(stream2, "%d", &indval) == EOF)  perror (("Error: indicesfile["+ findices +"] has too few elements (must be "+to_string(nNon0)+")").c_str());
 		indices.push_back(indval);
 	}
 	fclose(stream2);
