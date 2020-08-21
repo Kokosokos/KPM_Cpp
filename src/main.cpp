@@ -132,6 +132,7 @@ int main(int argc, char* argv[])
 
 		if (vm.count("mode"))
 		{
+			cout<<"Parsing mode...\n";
 			if(vm["mode"].as<string>() == "dos")
 				kpmmode = 0;
 			else if(vm["mode"].as<string>() == "gdos")
@@ -181,12 +182,14 @@ int main(int argc, char* argv[])
 			//			fnindptr  = vm["csr"].as<vector<string>>()[2];
 
 			cout<<"CSR files: "<<csrFiles[0]<< " "<<  csrFiles[1]<<" "<<csrFiles[2]<<endl;
+			
 		}
 		else
 		{
 			cout << "Error: Please provide 3 files when using --csr: data, indices and indptr."<<endl;
 			return 0;
 		}
+		cout<<"Parsing input args ended..\n";
 
 	}
 	catch (const error &ex)
@@ -200,12 +203,15 @@ int main(int argc, char* argv[])
 
 	//KPM START
 	//------------------------------------------------------------------------------------
+	cout<<"KPM started....\n";
 	int rank = MPI::COMM_WORLD.Get_rank();
 	//	Eigen::setNbThreads(4);
 	clock_t t;
 	t = clock();
 	sMatrix hessian;
+	cout<<"Reading matrix....\n";
 	fmanager.readCSR(csrFiles[0], csrFiles[1], csrFiles[2], hessian);
+	cout<<"Reading matrix... Finished\n";
 	KPM kpm( hessian, K, R );
 
 	if(find_eminmax)
