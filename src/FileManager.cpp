@@ -15,6 +15,40 @@
 #include <Eigen/Core>
 #include <Eigen/SparseCore>
 
+std::string mem()
+{
+
+    const std::string info[] = {"Cached:", "Buffers:", "MemFree:", "MemTotal:"};
+    int intInfo[4];
+
+    std::string token;
+    std::ifstream file("/proc/meminfo");
+
+    while(file >> token){
+
+        for(short i = 4; i != -1; --i)
+        {
+            if(token == info[i])
+            {
+                file >> intInfo[i];
+
+                if(i == 0){
+                    file.close();
+                    return std::to_string((intInfo[3] - intInfo[2] - (intInfo[1] + intInfo[0])) / 1024) + "m ";
+                }
+
+            }
+        }
+
+       // ignore rest of the line
+        file.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    }
+
+
+    // Couldn't get a reading!
+    return "...";
+}
+
 FileManager::FileManager() {
 	// TODO Auto-generated constructor stub
 
@@ -229,7 +263,8 @@ float FileManager::readLAMMPSData(string filename, Vector& minvSqrt)
 void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix& hessian)
 {
 	//Read indptr from CSR matrix (== cumulative number of nonzero elements in a row)
-	std::cout<<"Reading indptr...\n";
+	std::cout<<"Reading indptr..." << "mem: " << mem() << std::endl;
+
 	vector<long int> indptr;
 	FILE *stream;
 	stream = fopen(findptr.c_str(), "r");
@@ -260,7 +295,7 @@ void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 	}
 	fclose(stream3);
 
-	std::cout<<"Reading dindices..."<<std::endl;
+	std::cout<<"Reading indices..." << "mem: " << mem() << std::endl;
 	FILE *stream2;
 	stream2 = fopen(findices.c_str(), "r");
 	int indval=0;
@@ -271,7 +306,7 @@ void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 		indices.push_back(indval);
 	}
 	fclose(stream2);
-	std::cout<<"Reading csr matrix finished..."<<std::endl;
+	std::cout<<"Reading csr matrix finished..." << "mem: " << mem() << std::endl;
 	int rowLen = 0;
 
 	//Create sparse matrix
