@@ -228,28 +228,27 @@ float FileManager::readLAMMPSData(string filename, Vector& minvSqrt)
 
 void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix& hessian)
 {
-
 	//Read indptr from CSR matrix (== cumulative number of nonzero elements in a row)
-	//	vector<int> T(100000, 22);
-	vector<int> indptr;
+	std::cout<<"Reading indptr...\n";
+	vector<long int> indptr;
 	FILE *stream;
 	stream = fopen(findptr.c_str(), "r");
 	if (stream==NULL) perror ("Error opening file for indptr");
 
-	int val;
-	while(fscanf(stream, "%d", &val) != EOF)
+	long int val;
+	while(fscanf(stream, "%ld", &val) != EOF)
 	{
 		indptr.push_back(val);
 	}
 	fclose(stream);
 	unsigned int N=indptr.size()-1;
-	//	cout<<"N:"<<N<<endl;
 
 	int DOF = N;
 
 	//Read data and column indices
-	int nNon0 = *(indptr.end()-1); //number of non zero elements
+	long int nNon0 = *(indptr.end()-1); //number of non zero elements
 
+	std::cout<<"Reading data...Non zeros="<<nNon0<<std::endl;
 	FILE *stream3;
 	stream3 = fopen(fdata.c_str(), "r");
 	float dataval=0.0f;
@@ -261,6 +260,7 @@ void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 	}
 	fclose(stream3);
 
+	std::cout<<"Reading dindices..."<<std::endl;
 	FILE *stream2;
 	stream2 = fopen(findices.c_str(), "r");
 	int indval=0;
@@ -271,10 +271,11 @@ void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 		indices.push_back(indval);
 	}
 	fclose(stream2);
+	std::cout<<"Reading csr matrix finished..."<<std::endl;
 	int rowLen = 0;
-	int nnonzero = indptr[N];
 
 	//Create sparse matrix
+	std::cout<<"Creating sparse matrix..."<<std::endl;
 	hessian = sMatrix(N,N);
 	// Reserving enough space for non-zero elements
 
@@ -285,6 +286,7 @@ void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 	{
 		sizes[i]=indptr[i+1] - indptr[i];
 	}
+	std::cout<<"Reserving sparse matrix space..."<<std::endl;
 	hessian.reserve( sizes );
 	for (unsigned int i =0; i < N ;++i)
 	{
