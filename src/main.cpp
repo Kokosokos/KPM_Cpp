@@ -299,6 +299,8 @@ int main(int argc, char* argv[])
 			Vector logfreq = logspace(100, 0.01,1000);
 			Vector Gp = kpm.getModulus(97.0, Volume, freq, res, logfreq );
 			fmanager.write("Gp.dat",logfreq, Gp);
+			Vector Gpp = kpm.getModulusImag(97.0, Volume, freq, res, logfreq );
+			fmanager.write("Gpp.dat",logfreq, Gpp);
 		}
 	}
 

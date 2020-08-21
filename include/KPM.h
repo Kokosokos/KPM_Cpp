@@ -68,6 +68,7 @@ public:
 	Vector sumSeries(const Vector& freq, const Vector& gP);
 
 	Vector getModulus(const float& GA,  const float& volume, const Vector& gdos_freq, const Vector& gdos, const Vector& freq );
+	Vector getModulusImag(const float& GA, const float& volume, const Vector& gdos_freq, const Vector& gdos, const Vector& freq );
 
 	void HTilde();
 

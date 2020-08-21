@@ -283,7 +283,7 @@ Vector KPM::sumSeries(const Vector& freq, const Vector& gP)
 	for ( int k =0; k < m_K; ++k)
 	{
 
-		sumKPM			+= prefactor.cwiseProduct(( m_jk[k]*gP[k]/m_R)  * sin((k + 1) * arccosArgument));
+		sumKPM			+= prefactor.cwiseProduct(( m_jk[k]*gP[k]/m_R)  * sin((k + 1.0) * arccosArgument));
 
 	}
 	return sumKPM;
@@ -308,6 +308,27 @@ Vector KPM::getModulus(const float& GA, const float& volume, const Vector& gdos_
  	}
 
 	return Gp;
+}
+
+Vector KPM::getModulusImag(const float& GA, const float& volume, const Vector& gdos_freq, const Vector& gdos, const Vector& freq )
+{
+	cout<<"Modulus calculation....\n GA: "<<GA<<"\tVolume: "<<volume<<endl;
+	float nu = 1.0;
+//	float volume = 571.0;
+//	float N = m_DOF/3.0;
+
+	Vector Gpp = zeros(gdos_freq.size());
+	Vector e = sign(gdos_freq).cwiseProduct(sqr(gdos_freq));
+
+	int vsize = e.size();
+	for( int i = 0; i < freq.size();++i)
+	{
+			Vector ediff = e - ones(vsize) * freq[i] * freq[i];
+			Vector denom = ((sqr(ediff) + ones(vsize)*(nu * freq[i])*(nu * freq[i])) * volume / m_DOF).cwiseInverse();
+			Gpp[i] = trapz((gdos * freq[i] * nu).cwiseProduct(denom), gdos_freq);
+ 	}
+
+	return Gpp;
 }
 
 //Vector gp_gpp(n_bins_0, bin_min, bin_max, GA, GammaDos, nu, Volume, N):
