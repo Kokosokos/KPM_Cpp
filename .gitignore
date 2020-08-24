@@ -3,3 +3,7 @@ core
 /ReleaseMPI/**
 /Debug/**
 /*.dat
+/test_5k
+/test_5k/**
+/test_100k
+/test_100k/**
