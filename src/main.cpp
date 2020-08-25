@@ -209,9 +209,9 @@ int main(int argc, char* argv[])
 	clock_t t;
 	t = clock();
 	sMatrix hessian;
-	cout<<"Reading matrix....\n";
+	cout<<"main: Reading matrix...."<<"mem: " << mem()<<endl;
 	fmanager.readCSR(csrFiles[0], csrFiles[1], csrFiles[2], hessian);
-	cout<<"Reading matrix... Finished\n";
+	cout<<"main: Reading matrix... Finished"<<"mem: " << mem()<<endl;
 	KPM kpm( hessian, K, R );
 
 	if(find_eminmax)

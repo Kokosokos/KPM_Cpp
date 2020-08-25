@@ -11,7 +11,8 @@
 #include <stdio.h>
 #include <iostream>
 #include "core.h"
-
+#include<unistd.h>
+std::string mem();
 using namespace std;
 
 class FileManager {
