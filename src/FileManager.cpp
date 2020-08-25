@@ -324,6 +324,13 @@ void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 	std::cout<<"Creating sparse matrix..."<<std::endl;
 	hessian = sMatrix(N,N);
 	// Reserving enough space for non-zero elements
+	vector<int> sizes(N);
+	for (unsigned int i =0; i < N ;++i)
+	{
+		sizes[i]=indptr[i+1] - indptr[i];
+	}
+	std::cout<<"Reserving sparse matrix space..."<<"mem: " << mem()<<std::endl;
+	hessian.reserve( sizes );
 
 	for (unsigned int i =0; i < N ;++i)
 	{
