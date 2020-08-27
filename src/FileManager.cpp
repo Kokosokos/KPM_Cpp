@@ -330,22 +330,28 @@ void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 		sizes[i]=indptr[i+1] - indptr[i];
 	}
 	std::cout<<"Reserving sparse matrix space..."<<"mem: " << mem()<<std::endl;
-	hessian.reserve( sizes );
-
+//	hessian.reserve( sizes );
+	hessian.reserve( nNon0 );
+	std::cout<<"Reserving sparse matrix space...finished"<<"mem: " << mem()<<std::endl;
 	for (unsigned int i =0; i < N ;++i)
 	{
 		rowLen = indptr[i+1] - indptr[i];
 
-
+		hessian.startVec(i);
 		for (int j =0;j <rowLen;++j)
 		{
-			if(fscanf(stream3, "%f", &dataval) == EOF)  perror (("Error: datafile["+ fdata +"] has too few elements").c_str());
-			if(fscanf(stream2, "%d", &indval) == EOF)  perror (("Error: indicesfile["+ findices +"] has too few elements (must be "+to_string(nNon0)+")").c_str());
-			hessian.insert( i, indval-1) =  dataval ;
+			//if(fscanf(stream3, "%f", &dataval) == EOF)  perror (("Error: datafile["+ fdata +"] has too few elements").c_str());
+			//if(fscanf(stream2, "%d", &indval) == EOF)  perror (("Error: indicesfile["+ findices +"] has too few elements (must be "+to_string(nNon0)+")").c_str());
+			fscanf(stream3, "%f", &dataval);
+			fscanf(stream2, "%d", &indval);
+//			hessian.insert( i, indval-1) =  dataval ;
+			hessian.insertBack( i, indval-1) =  dataval ;
+//			hessian.coeffRef(i, indval-1) = dataval;
 		}
 		if( i % 1000 == 0)
 			std::cout<<"Reading "<<i<<"th row..." << "mem: " << mem() << std::endl;
 	}
+	hessian.finalize();
 	std::cout<<"Reading csr matrix finished..." << "mem: " << mem() << std::endl;
 	fclose(stream2);
 	fclose(stream3);
