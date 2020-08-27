@@ -5,7 +5,7 @@
  *      Author: ikriuchevs
  */
 #define EIGEN
-#define EIGEN_DEFAULT_DENSE_INDEX_TYPE long long int
+#define EIGEN_DEFAULT_DENSE_INDEX_TYPE long int
 #ifndef __CORE_H_
 #define __CORE_H_
 
