@@ -19,7 +19,7 @@ const double c_PI=3.14159;
 
 const   Eigen::StorageOptions c_myStorageOrder =  Eigen::RowMajor;
 typedef long int indexType;
-
+//typedef int indexType;
 typedef Eigen::SparseMatrix<double, c_myStorageOrder> sMatrix2;
 typedef Eigen::SparseMatrix<double, c_myStorageOrder, indexType> sMatrix;
 typedef Eigen::VectorXd Vector;

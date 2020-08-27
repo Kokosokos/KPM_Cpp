@@ -338,15 +338,17 @@ void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 			//if(fscanf(stream3, "%f", &dataval) == EOF)  perror (("Error: datafile["+ fdata +"] has too few elements").c_str());
 			//if(fscanf(stream2, "%d", &indval) == EOF)  perror (("Error: indicesfile["+ findices +"] has too few elements (must be "+to_string(nNon0)+")").c_str());
 			fscanf(stream3, "%f", &dataval);
-			fscanf(stream2, "%d", &indval);
+			fscanf(stream2, "%ld", &indval);
 //			hessian.insert( i, indval-1) =  dataval ;
 			hessian.insertBack( i, indval-1) =  dataval ;
 //			hessian.coeffRef(i, indval-1) = dataval;
 		}
-		if( i % 1000 == 0)
-			std::cout<<"Reading "<<i<<"th row..." << "mem: " << mem() << std::endl;
+		if( i % 1000 == 0 )
+			std::cout<<"Reading "<<i<<"th row..." << "; (value, index) = ("<<dataval<<", "<<indval<< "); mem: " << mem() << std::endl;
 	}
 	hessian.finalize();
+	std::cout<<"Outer index size: "<<sizeof(*hessian.outerIndexPtr())<<std::endl;
+	std::cout<<"Inner index size: "<<sizeof(*hessian.innerIndexPtr())<<std::endl;
 	std::cout<<"Reading csr matrix finished..." << "mem: " << mem() << std::endl;
 	fclose(stream2);
 	fclose(stream3);
