@@ -7,9 +7,10 @@
 
 #ifndef KPM_H_
 #define KPM_H_
+//#include "core.h"
 #include <iostream>
 #include <stdio.h>
-#include "core.h"
+
 #include "FileManager.h"
 
 using namespace std;

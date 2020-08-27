@@ -5,7 +5,7 @@
  *      Author: ikriuchevs
  */
 #define EIGEN
-
+#define EIGEN_DEFAULT_DENSE_INDEX_TYPE long long int
 #ifndef __CORE_H_
 #define __CORE_H_
 
@@ -18,8 +18,10 @@ const double c_PI=3.14159;
 #include <Eigen/Sparse>
 
 const   Eigen::StorageOptions c_myStorageOrder =  Eigen::RowMajor;
+typedef long int indexType;
 
-typedef Eigen::SparseMatrix<double, c_myStorageOrder> sMatrix;
+typedef Eigen::SparseMatrix<double, c_myStorageOrder> sMatrix2;
+typedef Eigen::SparseMatrix<double, c_myStorageOrder, indexType> sMatrix;
 typedef Eigen::VectorXd Vector;
 
 

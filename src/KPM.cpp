@@ -55,8 +55,8 @@ void KPM::setMassVectorInvSqrt( const Vector& mInvSqrt)
 void KPM::findEmin()
 {
 	Eigen::VectorXcd evalues;
-	SparseGenMatProd<double,  c_myStorageOrder> op(m_hessian);
-	GenEigsSolver< double, SMALLEST_REAL, SparseGenMatProd<double, c_myStorageOrder> > eigs(&op, 3, 7);
+	SparseGenMatProd<double,  c_myStorageOrder, indexType> op(m_hessian);
+	GenEigsSolver< double, SMALLEST_REAL, SparseGenMatProd<double, c_myStorageOrder, indexType> > eigs(&op, 3, 7);
 	// Initialize and compute
 	eigs.init();
 	eigs.compute();
@@ -72,10 +72,10 @@ void KPM::findEmin()
 void KPM::findEmax()
 {
 	Eigen::VectorXcd evalues;
-	SparseGenMatProd<double,  c_myStorageOrder> op(m_hessian);
+	SparseGenMatProd<double,  c_myStorageOrder,indexType> op(m_hessian);
 
 	// Construct eigen solver object, requesting the largest three eigenvalues
-	GenEigsSolver< double, LARGEST_MAGN, SparseGenMatProd<double, c_myStorageOrder> > eigs(&op, 3, 7);
+	GenEigsSolver< double, LARGEST_MAGN, SparseGenMatProd<double, c_myStorageOrder, indexType> > eigs(&op, 3, 7);
 	// Initialize and compute
 	eigs.init();
 	eigs.compute();
@@ -160,7 +160,6 @@ void KPM::HTilde()
 	double  b = bScaling();
 
 	m_hessian.diagonal() -= b*ones(m_hessian.rows());
-	//m_hessian = m_hessian - b*Eigen::MatrixXd::Identity(m_hessian.rows(), m_hessian.cols());
 	m_hessian /= a;
 }
 

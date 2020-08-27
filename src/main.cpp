@@ -6,11 +6,11 @@
 // Description : Hello World in C++, Ansi-style
 //============================================================================
 
+
+#include "KPM.h"
 #include <iostream>
 #include <fstream>
 
-
-#include "KPM.h"
 
 //!!!! Implement ZERO FREQ SHEAR MODULUS output!!!
 //!
@@ -36,18 +36,6 @@ using namespace boost::program_options;
 int main(int argc, char* argv[])
 {
 
-
-
-//	Vector v = normal(10000);
-//	std::map<int, int> hist{};
-//	for(int n=0; n<10000; ++n) {
-//		++hist[std::round(v[n])];
-//	}
-//	for(auto p : hist) {
-//		std::cout << std::setw(2)
-//		<< p.first << ' ' << std::string(p.second/100, '*') << '\n';
-//	}
-//	return 0;
 	MPI::Init(argc, argv);
 
 	int K = 1000;
@@ -272,7 +260,7 @@ int main(int argc, char* argv[])
 		else
 		{
 
-			for (int i =0; i< gpFiles.size(); ++i)
+			for (unsigned int i =0; i< gpFiles.size(); ++i)
 			{
 				Vector locgp = zeros(kpm.getK());
 				fmanager.read(gpFiles[i], locgp);
