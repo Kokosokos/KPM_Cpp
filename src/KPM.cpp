@@ -29,10 +29,10 @@ using namespace Spectra;
 //	readCSR();
 //}
 
-KPM::KPM(const sMatrix& hessian,  unsigned int K, unsigned int R, float nuEdge): m_R(R), m_nuEdge(nuEdge)
+KPM::KPM(sMatrix& hessian,  unsigned int K, unsigned int R, float nuEdge): m_R(R), m_nuEdge(nuEdge),m_hessian(hessian)
 {
 	setK(K);
-	m_hessian = hessian;
+	std::cout<<"KPM constructor..."<<"mem: " << mem()<<std::endl;
 	m_DOF = m_hessian.cols();
 }
 

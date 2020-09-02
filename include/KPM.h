@@ -59,7 +59,7 @@ public:
 	void setAF(const Vector& af);
 
 //	KPM(); add hessian set flag??
-	KPM(const sMatrix& hessian, unsigned int K, unsigned int R, float nuEdge = 0.05);
+	KPM(sMatrix& hessian, unsigned int K, unsigned int R, float nuEdge = 0.05);
 	virtual ~KPM();
 
 
@@ -98,7 +98,7 @@ public:
 	/**
 	 * @brief Hessian matrix.
 	 */
-	sMatrix  m_hessian;
+	sMatrix&  m_hessian;
 
 	/**
 	 * @brief Affine force field vector.
