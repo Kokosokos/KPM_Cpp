@@ -309,14 +309,24 @@ void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 	//Read data and column indices
 	long int nNon0 = *(indptr.end()-1); //number of non zero elements
 
-	std::cout<<"Reading data..."<<"mem: " << mem()<<std::endl;
-	FILE *stream3;
-	stream3 = fopen(fdata.c_str(), "r");
-	FILE *stream2;
-	stream2 = fopen(findices.c_str(), "r");
+	std::cout<<"Reading data..."<<"mem: " << mem()<<"; nonzeros "<<nNon0<<std::endl;
+	std::ifstream ifile3(fdata.c_str(), std::ios::in);
+	if (!ifile3.is_open()) {
+        std::cerr << "There was a problem opening the data file!\n";
+        exit(1);//exit or do additional error checking
+    }
+	std::ifstream ifile2(findices.c_str(), std::ios::in);
+	if (!ifile2.is_open()) {
+        std::cerr << "There was a problem opening the indices file!\n";
+        exit(1);//exit or do additional error checking
+    }
+//	FILE *stream3;
+//	stream3 = fopen(fdata.c_str(), "r");
+//	FILE *stream2;
+//	stream2 = fopen(findices.c_str(), "r");
 
 
-	float dataval=0.0f;
+	double dataval=0.0;
 	int indval=0;
 	int rowLen = 0;
 
@@ -328,6 +338,8 @@ void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 	std::cout<<"Reserving sparse matrix space..."<<"mem: " << mem()<<std::endl;
 	hessian.reserve( nNon0 );
 	std::cout<<"Reserving sparse matrix space...finished"<<"mem: " << mem()<<std::endl;
+	vector<double> vdata;
+	vector<long int> vindices;
 	for (unsigned int i =0; i < N ;++i)
 	{
 		rowLen = indptr[i+1] - indptr[i];
@@ -337,21 +349,30 @@ void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 		{
 			//if(fscanf(stream3, "%f", &dataval) == EOF)  perror (("Error: datafile["+ fdata +"] has too few elements").c_str());
 			//if(fscanf(stream2, "%d", &indval) == EOF)  perror (("Error: indicesfile["+ findices +"] has too few elements (must be "+to_string(nNon0)+")").c_str());
-			fscanf(stream3, "%f", &dataval);
-			fscanf(stream2, "%ld", &indval);
-//			hessian.insert( i, indval-1) =  dataval ;
+//			fscanf(stream3, "%lf", &dataval);
+//			fscanf(stream2, "%ld", &indval);
+			ifile3 >> dataval;
+			ifile2 >> indval;
+//			if(i > 32000)
+//			{
+			//	vdata.push_back(dataval);
+			//	vindices.push_back(indval);
+//			}
+			//if(i==31919)
+			//	std::cout<<"Reading "<<j<<"th element..." << "; (value, index) = ("<<dataval<<", "<<indval<< "); mem: " << mem() << std::endl;
+//			hessian.coeffRef(i, indval-1) = dataval;	//		hessian.insertBack( i, indval-1) =  dataval ;
 			hessian.insertBack( i, indval-1) =  dataval ;
-//			hessian.coeffRef(i, indval-1) = dataval;
+//			hessian.insert( i, indval-1) =  dataval ;
 		}
-		if( i % 1000 == 0 )
+		if( i % 1000 == 0)
 			std::cout<<"Reading "<<i<<"th row..." << "; (value, index) = ("<<dataval<<", "<<indval<< "); mem: " << mem() << std::endl;
 	}
 	hessian.finalize();
 	std::cout<<"Outer index size: "<<sizeof(*hessian.outerIndexPtr())<<std::endl;
 	std::cout<<"Inner index size: "<<sizeof(*hessian.innerIndexPtr())<<std::endl;
 	std::cout<<"Reading csr matrix finished..." << "mem: " << mem() << std::endl;
-	fclose(stream2);
-	fclose(stream3);
+//	fclose(stream2);
+//	fclose(stream3);
 	//	m_hessian.makeCompressed();
 	//get 1 element
 
