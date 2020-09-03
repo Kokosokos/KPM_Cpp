@@ -229,9 +229,9 @@ int main(int argc, char* argv[])
 		Volume = fmanager.readLAMMPSData(mfile, minvSqrt);
 		kpm.setMassVectorInvSqrt(minvSqrt);
 	}
-
+	cout<<"main: HTilde..start "<<"mem: " << mem()<<endl;
 	kpm.HTilde();
-
+	cout<<"main: HTilde..end "<<"mem: " << mem()<<endl;
 
 
 	//	Vector gp = kpm.getCoeffDOS();
@@ -240,7 +240,9 @@ int main(int argc, char* argv[])
 	Vector gp  = zeros(kpm.getK());
 	if(!kpmmode)
 	{
+		cout<<"main: getCoeffDOS..start "<<"mem: " << mem()<<endl;
 		gp = kpm.getCoeffDOS();
+		cout<<"main: getCoeffDOS..end "<<"mem: " << mem()<<endl;
 		gpFile = "gpDOS.dat";
 		resFile = "DOS.dat";
 	}

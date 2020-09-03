@@ -160,6 +160,7 @@ void KPM::HTilde()
 	double  b = bScaling();
 
 	m_hessian.diagonal() -= b*ones(m_hessian.rows());
+	std::cout<<"Diagonal size: "<<m_hessian.diagonal().rows()<<"; non zeros = "<< m_hessian.diagonal().nonZeros()<<std::endl;
 	m_hessian /= a;
 }
 
