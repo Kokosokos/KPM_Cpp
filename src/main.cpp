@@ -229,6 +229,9 @@ int main(int argc, char* argv[])
 		Volume = fmanager.readLAMMPSData(mfile, minvSqrt);
 		kpm.setMassVectorInvSqrt(minvSqrt);
 	}
+	t = clock() - t;
+
+	printf ("Reading csr took me %d clicks (%f seconds).\n",(int) t,((float)t)/CLOCKS_PER_SEC);
 	cout<<"main: HTilde..start "<<"mem: " << mem()<<endl;
 	kpm.HTilde();
 	cout<<"main: HTilde..end "<<"mem: " << mem()<<endl;
