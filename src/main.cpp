@@ -195,7 +195,7 @@ int main(int argc, char* argv[])
 	int rank = MPI::COMM_WORLD.Get_rank();
 	//	Eigen::setNbThreads(4);
 	clock_t t;
-	clock_t tstart
+	clock_t tstart;
 	tstart = clock();
 	sMatrix hessian;
 	cout<<"main: Reading matrix...."<<"mem: " << mem()<<endl;
