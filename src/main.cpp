@@ -195,7 +195,8 @@ int main(int argc, char* argv[])
 	int rank = MPI::COMM_WORLD.Get_rank();
 	//	Eigen::setNbThreads(4);
 	clock_t t;
-	t = clock();
+	clock_t tstart
+	tstart = clock();
 	sMatrix hessian;
 	cout<<"main: Reading matrix...."<<"mem: " << mem()<<endl;
 	fmanager.readCSR(csrFiles[0], csrFiles[1], csrFiles[2], hessian);
@@ -229,7 +230,7 @@ int main(int argc, char* argv[])
 		Volume = fmanager.readLAMMPSData(mfile, minvSqrt);
 		kpm.setMassVectorInvSqrt(minvSqrt);
 	}
-	t = clock() - t;
+	t = clock() - tstart;
 
 	printf ("Reading csr took me %d clicks (%f seconds).\n",(int) t,((float)t)/CLOCKS_PER_SEC);
 	cout<<"main: HTilde..start "<<"mem: " << mem()<<endl;
@@ -286,7 +287,7 @@ int main(int argc, char* argv[])
 
 		fmanager.write(gpFile,gp);
 		fmanager.write(resFile,freq, res);
-		t = clock() - t;
+		t = clock() - tstart;
 
 		printf ("It took me %d clicks (%f seconds).\n",(int) t,((float)t)/CLOCKS_PER_SEC);
 		FILE *stream;
