@@ -166,6 +166,8 @@ void KPM::HTilde()
 	{
 		m_hessian.coeffRef(i,i) -= b;
 		m_hessian.coeffRef(i,i) /= a;
+		if(i==1000)
+			std::cout<<i<<std::endl;
 	}
 }
 
