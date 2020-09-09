@@ -162,12 +162,14 @@ void KPM::HTilde()
 	std::cout<<"Diagonal size: "<<m_hessian.diagonal().rows()<<"; non zeros = "<< m_hessian.diagonal().nonZeros()<<std::endl;
 //	m_hessian.diagonal() -= b*ones(m_hessian.rows());
 //	m_hessian /= a;
+
 	for (int i =0; i < m_hessian.rows(); ++i)
 	{
+		if(m_hessian.coeff(i,i)==0)
+			std::cout<<"zero diag: "<<i<<std::endl;
 		m_hessian.coeffRef(i,i) -= b;
 		m_hessian.coeffRef(i,i) /= a;
-		if(i==1000)
-			std::cout<<i<<std::endl;
+
 	}
 }
 
