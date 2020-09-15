@@ -336,7 +336,8 @@ void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 	// Reserving enough space for non-zero elements
 
 	std::cout<<"Reserving sparse matrix space..."<<"mem: " << mem()<<std::endl;
-	hessian.reserve( nNon0 );
+//	hessian.reserve( nNon0 );
+	hessian.reserve( nNon0 + N);
 	std::cout<<"Reserving sparse matrix space...finished"<<"mem: " << mem()<<std::endl;
 	vector<double> vdata;
 	vector<long int> vindices;
@@ -348,6 +349,8 @@ void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 		rowLen = indptr[i+1] - indptr[i];
 
 		hessian.startVec(i);
+		if(rowLen == 0)
+			hessian.insertBack( i, i ) =  0.0f ;
 		for (int j =0;j <rowLen;++j)
 		{
 			//if(fscanf(stream3, "%f", &dataval) == EOF)  perror (("Error: datafile["+ fdata +"] has too few elements").c_str());
