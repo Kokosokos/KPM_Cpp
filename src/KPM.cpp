@@ -179,8 +179,10 @@ Vector KPM::getCoeffDOS()
 {
 	Vector loc_gP = zeros(m_K); // gauss projection
 	Vector glob_gP = zeros(m_K); // gauss projection
-	int rank = MPI::COMM_WORLD.Get_rank();
-	int size = MPI::COMM_WORLD.Get_size();
+	int rank;
+	int size;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
 
 	for (int r = rank; r < m_R; r+=size)
 	{
@@ -214,7 +216,7 @@ Vector KPM::getCoeffDOS()
 		}
 	}
 	processEnded();
-	MPI::COMM_WORLD.Reduce(loc_gP.data(), glob_gP.data(), m_K, MPI::DOUBLE, MPI::SUM, 0);
+	MPI_Reduce(loc_gP.data(), glob_gP.data(), m_K, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
 	return glob_gP;
 }
 
@@ -224,8 +226,10 @@ Vector KPM::getCoeffGammaDOS()
 	Vector loc_gP = zeros(m_K); // gauss projection
 	Vector glob_gP = zeros(m_K); // gauss projection
 
-	int rank = MPI::COMM_WORLD.Get_rank();
-	int size = MPI::COMM_WORLD.Get_size();
+	int rank;
+	int size;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	cout <<"MPI size:"<< size<<endl;
 	for (int r = rank; r < m_R; r+=size)
 	{
@@ -267,7 +271,7 @@ Vector KPM::getCoeffGammaDOS()
 		}
 	}
 	processEnded();
-	MPI::COMM_WORLD.Reduce(loc_gP.data(), glob_gP.data(), m_K, MPI::DOUBLE, MPI::SUM, 0);
+	MPI_Reduce(loc_gP.data(), glob_gP.data(), m_K, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
 	cout<<"rank: "<<rank<<". loc: "<<loc_gP[0]<<". glob: "<<glob_gP[0]<<endl;
 	return glob_gP;
 }

@@ -36,7 +36,7 @@ using namespace boost::program_options;
 int main(int argc, char* argv[])
 {
 
-	MPI::Init(argc, argv);
+	MPI_Init(&argc, &argv);
 
 	int K = 1000;
 	int R = 20;
@@ -305,6 +305,6 @@ int main(int argc, char* argv[])
 	}
 
 
-	MPI::Finalize();
+	MPI_Finalize();
 	return 0;
 }
