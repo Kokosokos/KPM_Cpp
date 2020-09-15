@@ -336,7 +336,7 @@ void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 	// Reserving enough space for non-zero elements
 
 	std::cout<<"Reserving sparse matrix space..."<<"mem: " << mem()<<std::endl;
-//	hessian.reserve( nNon0 );
+
 	hessian.reserve( nNon0 + N);
 	std::cout<<"Reserving sparse matrix space...finished"<<"mem: " << mem()<<std::endl;
 	vector<double> vdata;

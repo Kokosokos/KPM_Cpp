@@ -1,0 +1,47 @@
+#0) set env variables
+export workspace=~/KPM_Cpp
+export eigendir=~/eigen 
+export spectradir=~/spectra
+
+
+#1) load eigen lib:
+#--------------------------------------------------
+cd $eigendir
+git clone https://gitlab.com/libeigen/eigen.git .
+
+#--------------------------------------------------
+
+
+#2) load spectra llib:
+#--------------------------------------------------
+cd $spectradir
+git clone https://github.com/yixuan/spectra.git .
+#--------------------------------------------------
+
+#3) add mpi path
+mpibin=$(which mpic++) #locat mpi
+export mpiinclude=$(dirname $mpibin)/../include #== /opt/ohpc/pub/mpi/mpich-gnu8-ohpc/3.3.1/include/
+
+#4) boost 1.67
+cd ~/
+wget -O boost_1_67_0.tar.gz https://sourceforge.net/projects/boost/files/boost/1.67.0/boost_1_67_0.tar.gz/download
+tar -xvf boost_1_67_0.tar.gz
+mkdir usr
+./bootstrap.sh --prefix=~/usr --with-libraries=mpi,program_options
+./b2 install
+
+export locallibdir=/home/users/ivan.kriuchevskyi/usr #~/usr
+export boostinclude=$locallibdir/include
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$locallibdir/lib # to run KPM after
+#5) build
+#Compile
+mkdir $workspace/ReleaseMPI
+cd $workspace/ReleaseMPI
+for f in ../src/*.cpp;
+do
+	ff=$(basename $f .cpp);
+	mpic++ -I"$workspace/include" -I$boostinclude -I$eigendir -I$spectradir/include/ -I$mpiinclude -O3 -Wall -c -fmessage-length=0 -MMD -MP -MF"../src/$ff.d" -MT"../src/$ff.d" -o "../src/$ff.o" "../src/$ff.cpp"
+done
+#Linker
+#mpic++ -lboost_program_options -o KPM ../src/*o
+mpic++ -L$locallibdir/lib  -fopenmp -o ../ReleaseMPI/KPM ../src/*o  -lboost_program_options

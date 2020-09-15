@@ -159,9 +159,10 @@ void KPM::HTilde()
 	double  a = aScaling();
 	double  b = bScaling();
 
-	m_hessian.diagonal() -= b*ones(m_hessian.rows());
 	std::cout<<"Diagonal size: "<<m_hessian.diagonal().rows()<<"; non zeros = "<< m_hessian.diagonal().nonZeros()<<std::endl;
+	m_hessian.diagonal() -= b*ones(m_hessian.rows());
 	m_hessian /= a;
+
 }
 
 void KPM::jacksonKernel(int K)
