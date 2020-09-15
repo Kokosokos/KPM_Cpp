@@ -192,7 +192,8 @@ int main(int argc, char* argv[])
 	//KPM START
 	//------------------------------------------------------------------------------------
 	cout<<"KPM started....\n";
-	int rank = MPI::COMM_WORLD.Get_rank();
+	int rank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	//	Eigen::setNbThreads(4);
 	clock_t t;
 	clock_t tstart;
