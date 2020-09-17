@@ -56,15 +56,19 @@ void KPM::findEmin()
 {
 	Eigen::VectorXcd evalues;
 	SparseGenMatProd<double,  c_myStorageOrder, indexType> op(m_hessian);
-	GenEigsSolver< double, SMALLEST_REAL, SparseGenMatProd<double, c_myStorageOrder, indexType> > eigs(&op, 3, 7);
+	GenEigsSolver< double, SMALLEST_REAL, SparseGenMatProd<double, c_myStorageOrder, indexType> > eigs(&op, 3, 6);
 	// Initialize and compute
 	eigs.init();
-	eigs.compute();
+	eigs.compute(5000, 0.000001, SMALLEST_REAL);
 	// Retrieve results
 	if(eigs.info() == SUCCESSFUL)
 		evalues = eigs.eigenvalues();
 	else
-		std::cout << "\nWARNING: Can't calculate Emin:\n";
+		std::cout << "\nWARNING: Can't calculate Emin: ";
+		if( eigs.info() == NOT_CONVERGING)
+			std::cout<<"NOT_CONVERGING\n";
+		if( eigs.info() == NUMERICAL_ISSUE)
+			std::cout<<"NUMERICAL_ISSUE\n";
 	//	std::cout << "\nEigenvalues found:\n" << evalues << std::endl;
 	m_emin = evalues[0].real();
 }
