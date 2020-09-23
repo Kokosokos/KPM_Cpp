@@ -207,10 +207,12 @@ int main(int argc, char* argv[])
 	if(find_eminmax)
 	{
 		//if rank ==0; all the rest wait and then broadcast?
-		kpm.findEmin();
-		kpm.findEmax();
-		emin = kpm.getEmin();
+		if(!kpm.findEmax()) return 0;
+		if(!kpm.findEmin()) return 0;
+
 		emax = kpm.getEmax();
+		emin = kpm.getEmin();
+
 		if(rank == 0)
 			cout << "Emin Emax calculated: "<<emin<<"   "<<emax<<endl;
 	}
@@ -222,7 +224,7 @@ int main(int argc, char* argv[])
 				cout << "Emin Emax has been set: "<<emin<<"   "<<emax<<endl;
 	}
 
-	float Volume =0.0f;
+	float Volume = 0.0f;
 	if(mconst)
 		kpm.constMass(m);
 	else

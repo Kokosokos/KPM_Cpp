@@ -30,11 +30,11 @@ public:
 	/**
 	 * @brief Finds minimum eigenvalue.
 	 */
-	void findEmin();
+	bool findEmin();
 	/**
 	 * @brief Finds maximum eigenvalue.
 	 */
-	void findEmax();
+	bool findEmax();
 	/**
 	 * @brief Set minimum eigenvalue.
 	 */

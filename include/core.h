@@ -14,7 +14,6 @@
 
 const double c_PI=3.14159;
 
-
 #include <Eigen/Sparse>
 
 const   Eigen::StorageOptions c_myStorageOrder =  Eigen::RowMajor;

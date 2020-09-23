@@ -52,28 +52,32 @@ void KPM::setMassVectorInvSqrt( const Vector& mInvSqrt)
 	m_MinvSqrt = mInvSqrt;
 }
 
-void KPM::findEmin()
+bool KPM::findEmin()
 {
 	Eigen::VectorXcd evalues;
 	SparseGenMatProd<double,  c_myStorageOrder, indexType> op(m_hessian);
-	GenEigsSolver< double, SMALLEST_REAL, SparseGenMatProd<double, c_myStorageOrder, indexType> > eigs(&op, 3, 6);
+	GenEigsSolver< double, SMALLEST_REAL, SparseGenMatProd<double, c_myStorageOrder, indexType> > eigs(&op, 3, 20);
 	// Initialize and compute
 	eigs.init();
-	eigs.compute(5000, 0.000001, SMALLEST_REAL);
+	eigs.compute(5000, 0.001, SMALLEST_REAL);
 	// Retrieve results
 	if(eigs.info() == SUCCESSFUL)
 		evalues = eigs.eigenvalues();
 	else
+	{
 		std::cout << "\nWARNING: Can't calculate Emin: ";
 		if( eigs.info() == NOT_CONVERGING)
 			std::cout<<"NOT_CONVERGING\n";
 		if( eigs.info() == NUMERICAL_ISSUE)
 			std::cout<<"NUMERICAL_ISSUE\n";
+		return false;
+	}
 	//	std::cout << "\nEigenvalues found:\n" << evalues << std::endl;
 	m_emin = evalues[0].real();
+	return true;
 }
 
-void KPM::findEmax()
+bool KPM::findEmax()
 {
 	Eigen::VectorXcd evalues;
 	SparseGenMatProd<double,  c_myStorageOrder,indexType> op(m_hessian);
@@ -87,10 +91,13 @@ void KPM::findEmax()
 	if(eigs.info() == SUCCESSFUL)
 		evalues = eigs.eigenvalues();
 	else
+	{
 		std::cout << "WARNING: Can't calculate Emax:\n";
-
-	//	std::cout << "\nEigenvalues found:\n" << evalues << std::endl;
+		return false;
+		//	std::cout << "\nEigenvalues found:\n" << evalues << std::endl;
+	}
 	m_emax = evalues[0].real();
+	return true;
 }
 
 void KPM::setEmin( const float& emin)
