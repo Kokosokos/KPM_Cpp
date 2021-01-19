@@ -101,7 +101,7 @@ void FileManager::write(string filename, const Vector&  v1)
 	stream = fopen(filename.c_str(), "w");
 	for(int i = 0; i< v1.size(); ++i )
 	{
-		fprintf(stream, "%f\n", v1[i]);
+		fprintf(stream, "%.8f\n", v1[i]);
 	}
 	fclose(stream);
 }

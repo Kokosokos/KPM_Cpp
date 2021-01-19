@@ -73,19 +73,19 @@ int main(int argc, char* argv[])
 
 		//		namespace po = boost::program_options;
 		necessary.add_options()
-	    			  ("help,h", "Help screen")
-					  ("csr", value<vector<string>>(&csrFiles)->multitoken()->required(), "Input CSR fromatted matrix. data, indices and indptr filenames.")
-					  ("mode", value<string>()->required(), "set mode: dos or gdos");
+	    					  ("help,h", "Help screen")
+							  ("csr", value<vector<string>>(&csrFiles)->multitoken()->required(), "Input CSR fromatted matrix. data, indices and indptr filenames.")
+							  ("mode", value<string>()->required(), "set mode: dos or gdos");
 		optional.add_options()
-					  ("K", value<int>()->default_value(1000), "Set the maximum polynomial  order")
-					  ("R", value<int>()->default_value(20), "Set the number of random vectors")
-					  ("emin", value<float>(&emin), "Set the minimum eigenvalue (if not set we'll calculate it for you)")
-					  ("emax", value<float>(&emax), "Set the maximum eigenvalue")
-					  ("mfile", value<string>(), "lammps data file to read masses")
-					  ("m", value<float>(), "constant mass value");
+							  ("K", value<int>()->default_value(1000), "Set the maximum polynomial  order")
+							  ("R", value<int>()->default_value(20), "Set the number of random vectors")
+							  ("emin", value<float>(&emin), "Set the minimum eigenvalue (if not set we'll calculate it for you)")
+							  ("emax", value<float>(&emax), "Set the maximum eigenvalue")
+							  ("mfile", value<string>(), "lammps data file to read masses")
+							  ("m", value<float>(), "constant mass value");
 		gdos.add_options()
-					  ("af", value<string>(), "affine force filename")
-					  ("gp", value<vector<string>>(&gpFiles)->multitoken(), "gauss projection files (skip calculation and just sum)");
+							  ("af", value<string>(), "affine force filename")
+							  ("gp", value<vector<string>>(&gpFiles)->multitoken(), "gauss projection files (skip calculation and just sum)");
 		all.add(necessary).add(optional).add(gdos);
 		variables_map vm;
 
@@ -112,8 +112,8 @@ int main(int argc, char* argv[])
 
 		if (vm.count("emin") && vm.count("emax"))
 		{
-//			emin = vm["emin"].as<float>();
-//			emax = vm["emax"].as<float>();
+			//			emin = vm["emin"].as<float>();
+			//			emax = vm["emax"].as<float>();
 			find_eminmax = false;
 
 		}
@@ -170,7 +170,7 @@ int main(int argc, char* argv[])
 			//			fnindptr  = vm["csr"].as<vector<string>>()[2];
 
 			cout<<"CSR files: "<<csrFiles[0]<< " "<<  csrFiles[1]<<" "<<csrFiles[2]<<endl;
-			
+
 		}
 		else
 		{
@@ -221,7 +221,7 @@ int main(int argc, char* argv[])
 		kpm.setEmin( emin );
 		kpm.setEmax( emax );
 		if(rank == 0)
-				cout << "Emin Emax has been set: "<<emin<<"   "<<emax<<endl;
+			cout << "Emin Emax has been set: "<<emin<<"   "<<emax<<endl;
 	}
 
 	float Volume = 0.0f;
@@ -259,22 +259,28 @@ int main(int argc, char* argv[])
 		fmanager.readAF(affile, af);
 		kpm.setAF(af);
 		if(rank == 0)
+		{
 			cout << "gdos mode:"<<endl;
+		}
 		gpFile = "gpGammaDOS.dat";
 		resFile = "GammaDOS.dat";
 		if(!justGp)
 		{
+			cout << "calculating coeffs..."<<endl<<flush;
+
 			gp = kpm.getCoeffGammaDOS();
 		}
 		else
 		{
-
+			cout<<"reading coeff files..."<<gpFiles.size()<<flush;
 			for (unsigned int i =0; i< gpFiles.size(); ++i)
 			{
+				cout<<" "<<gpFiles[i]<<flush;
 				Vector locgp = zeros(kpm.getK());
 				fmanager.read(gpFiles[i], locgp);
 				gp += locgp;
 			}
+			cout<<"\n";
 		}
 
 	}
@@ -283,7 +289,22 @@ int main(int argc, char* argv[])
 	{
 
 		Vector freq = arange(4000, sgn(emin)*sqrt(fabs(emin)), sqrt(emax));
-		//		Vector dos = kpm.sumSeries(freq, gp);
+		if(kpmmode)
+		{
+			Vector neg,pos;
+//			neg = -1.0*logspace(int(fabs(emin)),-2, log10(sqrt(fabs(emin))));
+//			pos = logspace(int(emax), -2, log10(sqrt(emax)));
+			cout<<"Neg freq\n"<<flush;
+			neg = -1.0*logspace(int(fabs(emin)),0.01, sqrt(fabs(emin)));
+			cout<<"Pos freq\n"<<flush;
+			pos = logspace(int(emax), 0.01, sqrt(emax));
+			cout<<"Tot freq\n"<<flush;
+			freq = Vector(neg.size() + pos.size());
+			freq <<neg,pos;
+//			freq = np.concatenate([-np.logspace(-2,np.log10(np.sqrt(np.abs(EStart))),np.abs(EStart))[::-1],np.logspace(-2,np.log10(np.sqrt(EEnd)),np.abs(EEnd))]);
+
+		}
+		cout<<"Sum series started...\n"<<flush;
 		Vector res = kpm.sumSeries(freq, gp);
 		//		kpm.write("gP.dat",gp);
 		//		kpm.write("DOS.dat",freq, dos);
@@ -299,7 +320,7 @@ int main(int argc, char* argv[])
 
 		if(kpmmode)
 		{
-			Vector logfreq = logspace(100, 0.01,1000);
+			Vector logfreq = logspace(200, 0.01,1000);
 			Vector Gp = kpm.getModulus(97.0, Volume, freq, res, logfreq );
 			fmanager.write("Gp.dat",logfreq, Gp);
 			Vector Gpp = kpm.getModulusImag(97.0, Volume, freq, res, logfreq );

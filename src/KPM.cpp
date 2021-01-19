@@ -295,7 +295,7 @@ Vector KPM::sumSeries(const Vector& freq, const Vector& gP)
 	ETilde(e);
 	Vector	arccosArgument	= arccos(e);
 	Vector 	prefactor		= 4*abs(freq)*abs((2.0-m_nuEdge)/c_PI/(m_emax-m_emin));
-
+	std::cout<<"R======"<<m_R<<std::endl;
 	for ( int k =0; k < m_K; ++k)
 	{
 
@@ -314,12 +314,13 @@ Vector KPM::getModulus(const float& GA, const float& volume, const Vector& gdos_
 
 	Vector Gp = zeros(gdos_freq.size());
 	Vector e = sign(gdos_freq).cwiseProduct(sqr(gdos_freq));
-
 	int vsize = e.size();
 	for( int i = 0; i < freq.size();++i)
 	{
 			Vector ediff = e - ones(vsize) * freq[i] * freq[i];
+
 			Vector denom = ((sqr(ediff) + ones(vsize)*(nu * freq[i])*(nu * freq[i])) * volume / m_DOF).cwiseInverse();
+;
 			Gp[i] = GA - trapz(gdos.cwiseProduct(ediff).cwiseProduct(denom), gdos_freq);
  	}
 

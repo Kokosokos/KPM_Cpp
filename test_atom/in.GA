@@ -1,0 +1,55 @@
+variable                dtiltGA equal   0.05
+variable                deGA equal ${dtiltGA}*lz
+variable        U equal pe
+change_box all xy delta 0.0  remap units box
+run 0 pre yes post no
+variable        u0 equal ${U}
+#XY
+#-----------------------------------------------
+change_box all xy delta ${deGA}  remap units box
+run 0 pre yes post no
+variable        u1 equal ${U}
+
+change_box all xy delta ${deGA}  remap units box
+run 0 pre yes post no
+variable        u2 equal ${U}
+
+change_box all xy delta -${deGA}  remap units box
+change_box all xy delta -${deGA}  remap units box
+run 0 pre yes post no
+
+variable        GAxy equal (((${u2}-${u1})/${dtiltGA}-(${u1}-${u0})/${dtiltGA})/${dtiltGA})
+#-----------------------------------------------
+change_box all xz delta ${deGA}  remap units box
+run 0 pre yes post no
+variable        u1 equal ${U}
+
+change_box all xz delta ${deGA}  remap units box
+run 0 pre yes post no
+variable        u2 equal ${U}
+
+change_box all xz delta -${deGA}  remap units box
+change_box all xz delta -${deGA}  remap units box
+run 0 pre yes post no
+
+variable        GAxz equal (((${u2}-${u1})/${dtiltGA}-(${u1}-${u0})/${dtiltGA})/${dtiltGA})
+#-----------------------------------------------
+
+change_box all yz delta ${deGA}  remap units box
+run 0 pre yes post no
+variable        u1 equal ${U}
+
+change_box all yz delta ${deGA}  remap units box
+run 0 pre yes post no
+variable        u2 equal ${U}
+
+change_box all yz delta -${deGA}  remap units box
+change_box all yz delta -${deGA}  remap units box
+run 0 pre yes post no
+
+variable        GAyz equal (((${u2}-${u1})/${dtiltGA}-(${u1}-${u0})/${dtiltGA})/${dtiltGA})
+variable                avgGA equal (${GAxy}+${GAxz}+${GAyz})/3.0
+#variable               GAavg equal ${u0}+${u1}+${u2}
+#-----------------------------------------------
+print "${GAxy} ${GAxz} ${GAyz}" file GA.dat
+print "${avgGA}" file Avg.GA.dat

@@ -1,0 +1,13 @@
+change_box      all xz delta 0.0  remap units box
+run 0 pre yes post no
+write_dump      all custom aforceX1.dump fx fy fz modify sort id format line "%.12g %.12g %.12g"
+
+
+variable        ddXZ  equal ${dtilt}*lz
+#variable        ddXZ  equal 0.00001*lz
+change_box all xz delta ${ddXZ}  remap units box
+run 0 pre yes post no
+write_dump      all custom aforceX2.dump fx fy fz modify sort id format line "%.12g %.12g %.12g"
+change_box all xz delta -${ddXZ}  remap units box
+run 0 pre yes post no
+

@@ -1,0 +1,54 @@
+variable T equal 150
+#INPUT MODEL  
+#-------------------------------------------------------------------------------
+#read_restart   equi.restart
+include                 in.atom
+#Read initial configuration
+#-------------------------------------------------------------------------------
+read_data           equi.data
+change_box          all triclinic
+kspace_style        pppm 1e-4
+#kspace_style            ewald 1e-4
+reset_timestep          0
+#-------------------------------------------------------------------------------
+
+#COMPUTES & VARIABLES
+#-------------------------------------------------------------------------------
+#
+variable dt equal 1.0
+
+variable        temp equal temp
+variable        massgrams equal mass(all)/6.0225e23
+variable        vcm3 equal vol*1.0e-24
+variable        sv equal v_vcm3/v_massgrams
+variable        pe equal pe
+variable        ke equal ke
+variable        h equal enthalpy
+variable        press equal press
+variable        v   equal vol
+thermo 1000
+#-------------------------------------------------------------------------------
+#DYNAMICS: relax after cooling
+#-------------------------------------------------------------------------------
+timestep ${dt}
+#-------------------------------------------------------------------------------
+#Sampling
+#-------------------------------------------------------------------------------
+#Sample Non-affine force field
+print "${v}"    file V.dat screen "no"
+#fix    dyn all nvt temp 211.0 211.0 100.0
+#minimize 1.00e-30 1.00e-30 100000 1000000
+
+fix     dyn all npt temp ${T} ${T} 100.0 iso 1.0 1.0 1000.0
+run 0 pre yes post no
+write_restart   equi2.restart
+write_data equi2.data
+unfix dyn
+#dynamical_matrix all regular 0.00000001 file dynmat.dat sparse yes
+dynamical_matrix all eskm 0.00000001 file dynmat.eskm.dat csr yes
+
+timestep       0.001
+include in.AF
+#Sample GA
+include in.GA
+
