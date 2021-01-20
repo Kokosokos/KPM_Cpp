@@ -32,7 +32,6 @@ using namespace Spectra;
 KPM::KPM(sMatrix& hessian,  unsigned int K, unsigned int R, float nuEdge): m_R(R), m_nuEdge(nuEdge),m_hessian(hessian)
 {
 	setK(K);
-	std::cout<<"KPM constructor..."<<"mem: " << mem()<<std::endl;
 	m_DOF = m_hessian.cols();
 }
 
@@ -50,6 +49,7 @@ void KPM::constMass(float m)
 void KPM::setMassVectorInvSqrt( const Vector& mInvSqrt)
 {
 	m_MinvSqrt = mInvSqrt;
+
 }
 
 bool KPM::findEmin()
@@ -238,24 +238,25 @@ Vector KPM::getCoeffGammaDOS()
 	Vector loc_gP = zeros(m_K); // gauss projection
 	Vector glob_gP = zeros(m_K); // gauss projection
 
-	int rank;
+	int rank=0;
 	int size;
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
-	cout <<"MPI size:"<< size<<endl;
+	if(rank==0)
+		cout <<"MPI size:"<< size<<endl;
 	for (int r = rank; r < m_R; r+=size)
 	{
-		if (r % 100 == 0)
+		if (r % 100 < size )
 		{
 			processRunningStatus(float(r)/m_R);
-			if(rank == 0)
-				fmanager.write("gPgamma_K"+to_string(m_K)+"_R" +to_string(int(r/size)) + ".dat",loc_gP);
+//			if(rank == 0)
+//			fmanager.write("gPgamma.c"+to_string(rank)+"_K"+to_string(m_K)+"_R" +to_string(int(r/size)) + ".dat",loc_gP);
 		}
 
 		Vector v_r = normal(m_DOF);
 		v_r=v_r/v_r.norm();
-		if(r < 8)
-			fmanager.write("u"+to_string(r)+"c"+to_string(size)+".dat", v_r);
+//		if(r < 8)
+//			fmanager.write("u"+to_string(r)+"c"+to_string(size)+".dat", v_r);
 
 		double mLeft = m_af.dot(v_r);
 

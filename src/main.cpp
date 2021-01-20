@@ -42,6 +42,7 @@ int main(int argc, char* argv[])
 	int R = 20;
 	float emin = 0.0f;
 	float emax = 0.0f;
+	float GA = 97.0; //affine shear modulus
 	bool find_eminmax = true;
 	string affile;
 
@@ -85,6 +86,7 @@ int main(int argc, char* argv[])
 							  ("m", value<float>(), "constant mass value");
 		gdos.add_options()
 							  ("af", value<string>(), "affine force filename")
+							  ("GA", value<float>(), "affine shear modulus")
 							  ("gp", value<vector<string>>(&gpFiles)->multitoken(), "gauss projection files (skip calculation and just sum)");
 		all.add(necessary).add(optional).add(gdos);
 		variables_map vm;
@@ -126,9 +128,10 @@ int main(int argc, char* argv[])
 			else if(vm["mode"].as<string>() == "gdos")
 			{
 				kpmmode = 1;
-				if (vm.count("af") && ( vm.count("mfile") || vm.count("m")))
+				if (vm.count("af") && vm.count("GA") && ( vm.count("mfile") || vm.count("m")))
 				{
 					affile = vm["af"].as<string>();
+					GA = vm["GA"].as<float>();
 					if(vm.count("mfile"))
 					{
 						mfile = vm["mfile"].as<string>();
@@ -143,7 +146,7 @@ int main(int argc, char* argv[])
 				}
 				else
 				{
-					cout << "Error: please provide  affine force file(--af) and lammps data file (--mfile or --m for constant mass) for gammaDOS calculation."<<endl;
+					cout << "Error: please provide  affine force file(--af), affine shear modulus(--GA) and lammps data file (--mfile or --m for constant mass) for gammaDOS calculation."<<endl;
 					return 0;
 				}
 
@@ -191,7 +194,7 @@ int main(int argc, char* argv[])
 
 	//KPM START
 	//------------------------------------------------------------------------------------
-	cout<<"KPM started....\n";
+	processStatus("KPM started");
 	int rank;
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	//	Eigen::setNbThreads(4);
@@ -199,9 +202,9 @@ int main(int argc, char* argv[])
 	clock_t tstart;
 	tstart = clock();
 	sMatrix hessian;
-	cout<<"main: Reading matrix...."<<"mem: " << mem()<<endl;
+	processStatus(string("main: Reading matrix....mem: ") + mem());
 	fmanager.readCSR(csrFiles[0], csrFiles[1], csrFiles[2], hessian);
-	cout<<"main: Reading matrix... Finished"<<"mem: " << mem()<<endl;
+	processStatus(string("main: Reading matrix... Finished mem: ")+ mem() );
 	KPM kpm( hessian, K, R );
 
 	if(find_eminmax)
@@ -232,13 +235,15 @@ int main(int argc, char* argv[])
 		Vector minvSqrt;
 		Volume = fmanager.readLAMMPSData(mfile, minvSqrt);
 		kpm.setMassVectorInvSqrt(minvSqrt);
+
 	}
 	t = clock() - tstart;
 
-	printf ("Reading csr took me %d clicks (%f seconds).\n",(int) t,((float)t)/CLOCKS_PER_SEC);
-	cout<<"main: HTilde..start "<<"mem: " << mem()<<endl;
+//	printf ("Reading csr took me %d clicks (%f seconds).\n",(int) t,((float)t)/CLOCKS_PER_SEC);
+	processStatus(string("It took me ")+ to_string(((float)t)/CLOCKS_PER_SEC) +"seconds.");
+	processStatus(string("main: HTilde..start  mem: ") + mem() );
 	kpm.HTilde();
-	cout<<"main: HTilde..end "<<"mem: " << mem()<<endl;
+	processStatus(string("main: HTilde..end  mem: ") + mem() );
 
 
 	//	Vector gp = kpm.getCoeffDOS();
@@ -247,9 +252,9 @@ int main(int argc, char* argv[])
 	Vector gp  = zeros(kpm.getK());
 	if(!kpmmode)
 	{
-		cout<<"main: getCoeffDOS..start "<<"mem: " << mem()<<endl;
+		processStatus(string( "main: getCoeffDOS..start mem: ") +  mem() );
 		gp = kpm.getCoeffDOS();
-		cout<<"main: getCoeffDOS..end "<<"mem: " << mem()<<endl;
+		processStatus(string("main: getCoeffDOS..end mem: ") + mem()  );
 		gpFile = "gpDOS.dat";
 		resFile = "DOS.dat";
 	}
@@ -266,13 +271,13 @@ int main(int argc, char* argv[])
 		resFile = "GammaDOS.dat";
 		if(!justGp)
 		{
-			cout << "calculating coeffs..."<<endl<<flush;
+			processStatus("calculating coeffs...");
 
 			gp = kpm.getCoeffGammaDOS();
 		}
 		else
 		{
-			cout<<"reading coeff files..."<<gpFiles.size()<<flush;
+			processStatus("reading coeff files...");
 			for (unsigned int i =0; i< gpFiles.size(); ++i)
 			{
 				cout<<" "<<gpFiles[i]<<flush;
@@ -294,26 +299,28 @@ int main(int argc, char* argv[])
 			Vector neg,pos;
 //			neg = -1.0*logspace(int(fabs(emin)),-2, log10(sqrt(fabs(emin))));
 //			pos = logspace(int(emax), -2, log10(sqrt(emax)));
-			cout<<"Neg freq\n"<<flush;
+//			cout<<"Neg freq\n"<<flush;
 			neg = -1.0*logspace(int(fabs(emin)),0.01, sqrt(fabs(emin)));
-			cout<<"Pos freq\n"<<flush;
+//			cout<<"Pos freq\n"<<flush;
 			pos = logspace(int(emax), 0.01, sqrt(emax));
-			cout<<"Tot freq\n"<<flush;
+//			cout<<"Tot freq\n"<<flush;
 			freq = Vector(neg.size() + pos.size());
-			freq <<neg,pos;
+			freq <<neg.reverse(),pos;
+
 //			freq = np.concatenate([-np.logspace(-2,np.log10(np.sqrt(np.abs(EStart))),np.abs(EStart))[::-1],np.logspace(-2,np.log10(np.sqrt(EEnd)),np.abs(EEnd))]);
 
 		}
-		cout<<"Sum series started...\n"<<flush;
+		processStatus("Sum series started...");
 		Vector res = kpm.sumSeries(freq, gp);
 		//		kpm.write("gP.dat",gp);
 		//		kpm.write("DOS.dat",freq, dos);
 
 		fmanager.write(gpFile,gp);
 		fmanager.write(resFile,freq, res);
+		fmanager.write("freq.dat",freq);
 		t = clock() - tstart;
 
-		printf ("It took me %d clicks (%f seconds).\n",(int) t,((float)t)/CLOCKS_PER_SEC);
+		processStatus(string("It took me ")+ to_string(((float)t)/CLOCKS_PER_SEC) +"seconds.");
 		FILE *stream;
 		stream = fopen("time.dat", "a");
 		fprintf(stream, "%d %d %d %f\n", K, R, (int) t, ((float)t)/CLOCKS_PER_SEC);
@@ -321,7 +328,7 @@ int main(int argc, char* argv[])
 		if(kpmmode)
 		{
 			Vector logfreq = logspace(200, 0.01,1000);
-			Vector Gp = kpm.getModulus(97.0, Volume, freq, res, logfreq );
+			Vector Gp = kpm.getModulus(GA, Volume, freq, res, logfreq );
 			fmanager.write("Gp.dat",logfreq, Gp);
 			Vector Gpp = kpm.getModulusImag(97.0, Volume, freq, res, logfreq );
 			fmanager.write("Gpp.dat",logfreq, Gpp);

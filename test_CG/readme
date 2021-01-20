@@ -1,0 +1,5 @@
+#Small test of KPM build on CG model
+0) run KPM analysis for DOS (K and R - parameters of KPM, 1000/40 - should be enough for DOS calculation):
+    cores=8 #this will speed up the calculation but also increase RAM usage (~= RAM1 x cores)
+    mpirun -np $cores ./KPM --csr H.data.dat H.indices.dat H.indptr.dat --mode dos --K 1000 --R 40
+

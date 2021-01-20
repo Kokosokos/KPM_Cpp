@@ -110,6 +110,8 @@ template <typename T> int sgn(T val) {
 
 #include <random>
 #include <algorithm>
+
+#include "mpi.h"
 auto normalrnd = [](float mean, float sigma)
 {
     auto randomFunc = [distribution_ = std::normal_distribution<>(mean, sigma),
@@ -132,26 +134,51 @@ inline Vector normal( unsigned int nn)
 
 inline void processRunningStatus(float progress)
 {
-    int barWidth = 70;
+	int rank;
+	int size;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	if(rank == 0)
+	{
+		int barWidth = 70;
 
-    std::cout << "[";
-    int pos = barWidth * progress;
-    for (int i = 0; i < barWidth; ++i) {
-        if (i < pos) std::cout << "=";
-        else if (i == pos) std::cout << ">";
-        else std::cout << " ";
-    }
-    std::cout << "] " << int(progress * 100.0) << " %\r";
-    std::cout.flush();
+		std::cout << "[";
+		int pos = barWidth * progress;
+		for (int i = 0; i < barWidth; ++i) {
+			if (i < pos) std::cout << "=";
+			else if (i == pos) std::cout << ">";
+			else std::cout << " ";
+		}
+		std::cout << "] " << int(progress * 100.0) << " %\r";
+		std::cout.flush();
+	}
+}
+inline void processStatus( std::string message)
+{
+	int rank;
+	int size;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	if(rank == 0)
+	{
+		std::cout << message<< std::endl;
+	}
 }
 
 inline void processEnded()
 {
-	 std::cout<<std::endl;
-	 std::cout.flush();
+	int rank;
+	int size;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	if(rank==0)
+	 {
+		std::cout<<std::endl;
+		std::cout.flush();
+	 }
+
 }
 
-#include "mpi.h"
 
 
 #endif /* __CORE_H_ */

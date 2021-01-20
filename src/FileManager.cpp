@@ -241,10 +241,11 @@ float FileManager::readLAMMPSData(string filename, Vector& minvSqrt)
 				iss =  std::istringstream(results[1]);
 				iss>>m;
 				masses.push_back(m);
+
 			}
 
 		}
-
+//ADD sorting
 		if (line.find("Atoms", 0) != string::npos)
 		{
 			getline(fileInput, line);
@@ -271,8 +272,10 @@ float FileManager::readLAMMPSData(string filename, Vector& minvSqrt)
 			break;
 		}
 	}
+
 	//	m_M = Vector::Map(massesFull.data(), massesFull.size());
 	minvSqrt = Vector::Map(massesFull.data(), massesFull.size());
+	cout<<massesFull.size()<<" "<<massesFull[0]<<" "<<massesFull[3]<<" "<<minvSqrt[0]<<" "<<minvSqrt[3]<<endl;
 	Vol = Lx* Ly*Lz;
 	if (Vol == 0.0f)
 	{
@@ -289,7 +292,7 @@ float FileManager::readLAMMPSData(string filename, Vector& minvSqrt)
 void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix& hessian)
 {
 	//Read indptr from CSR matrix (== cumulative number of nonzero elements in a row)
-	std::cout<<"Reading indptr..." << "mem: " << mem() << std::endl;
+	processStatus(string("Reading indptr.. mem: ") +  mem());
 
 	vector<long int> indptr;
 	FILE *stream;
@@ -309,7 +312,7 @@ void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 	//Read data and column indices
 	long int nNon0 = *(indptr.end()-1); //number of non zero elements
 
-	std::cout<<"Reading data..."<<"mem: " << mem()<<"; nonzeros "<<nNon0<<std::endl;
+//	std::cout<<"Reading data..."<<"mem: " << mem()<<"; nonzeros "<<nNon0<<std::endl;
 //	std::ifstream ifile3(fdata.c_str(), std::ios::in);
 //	if (!ifile3.is_open()) {
 //        std::cerr << "There was a problem opening the data file!\n";
@@ -331,19 +334,19 @@ void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 	int rowLen = 0;
 
 	//Create sparse matrix
-	std::cout<<"Creating sparse matrix..."<<std::endl;
+	processStatus("Creating sparse matrix...");
 	hessian = sMatrix(N,N);
 	// Reserving enough space for non-zero elements
 
-	std::cout<<"Reserving sparse matrix space..."<<"mem: " << mem()<<std::endl;
+	processStatus("Reserving sparse matrix space..." );
 
 	hessian.reserve( nNon0 + N);
-	std::cout<<"Reserving sparse matrix space...finished"<<"mem: " << mem()<<std::endl;
+	processStatus(string("Reserving sparse matrix space...finished    mem: ") + mem());
 	vector<double> vdata;
 	vector<long int> vindices;
 	long int nel=0;
 	int percent = 2;
-	std::cout<<"Reading Hessian from csr...."<<std::endl;
+	processStatus("Reading Hessian from csr....");
 	for (unsigned int i =0; i < N ;++i)
 	{
 		rowLen = indptr[i+1] - indptr[i];
@@ -364,19 +367,20 @@ void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 			nel++;
 		}
 		double p = double(nel)/nNon0;
-		if( int(100*p) > percent || i == N/2 )
-		{
-
-			std::cout<<100*p<< "% (value, index) = ("<<dataval<<", "<<indval<< "); mem: " << mem()<< "\n";
-			std::cout.flush();
-//			processRunningStatus(double(p));
-			percent++;
-		}
+//		if( int(100*p) > percent || i == N/2 )
+//		{
+//
+//			std::cout<<100*p<< "% (value, index) = ("<<dataval<<", "<<indval<< "); mem: " << mem()<< "\n";
+//			std::cout.flush();
+		processRunningStatus(p);
+//			percent++;
+//		}
 	}
+	processEnded();
 	hessian.finalize();
-	std::cout<<"Outer index size: "<<sizeof(*hessian.outerIndexPtr())<<std::endl;
-	std::cout<<"Inner index size: "<<sizeof(*hessian.innerIndexPtr())<<std::endl;
-	std::cout<<"Reading csr matrix finished..." << "mem: " << mem() << std::endl;
+	processStatus(string("Outer index size: ") + to_string(sizeof(*hessian.outerIndexPtr())) );
+	processStatus(string("Inner index size: ")+ to_string(sizeof(*hessian.innerIndexPtr())) );
+	processStatus(string("Reading csr matrix finished... mem: ") + mem());
 	fclose(stream2);
 	fclose(stream3);
 	//	m_hessian.makeCompressed();

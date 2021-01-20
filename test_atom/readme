@@ -1,0 +1,16 @@
+1) copy "dynamical_matrix.h/cpp" to LAMMPS source
+2) Compile LAMMPS with new "dynamical_matrix.h/cpp"
+3) Use Hessian.lmp to produce Hessian matrix (also copy from "equi.data" and in.* into the same folder):
+	example:
+	dtilt=0.0001 #small strain increment to calculate non-affine force field 
+	mpirun -np 32 $LAMMPS -var dtilt ${dtilt} < Hessian.lmp
+	use AF.sh to calculate non-affine force field (could be also done in lammps but ...)
+	./AF.sh ${dtilt}
+
+4) run KPM analysis for DOS (K and R - parameters of KPM, 1000/40 - should be enough for DOS calculation):  
+	cores=8 #this will speed up the calculation but also increase RAM usage (~= RAM1 x cores)
+	mpirun -np $cores ./KPM --csr H.data.dat H.indices.dat H.indptr.dat --mode dos --K 1000 --R 40
+5) Run KPM analysis for GammaDOS and Shear modulus calculation:
+	 GA=...#affine shear modulus calculated elsewhere, an estimation also calculated in in.GA and saved to GA.dat (not very precise)
+	 mpirun -np ${cores} ../ReleaseMPI/KPM --csr H.data.dat H.indices.dat H.indptr.dat --mode gdos --af dF.csv --GA ${GA} --mfile CG.data --K 1000 --R 5000  
+ 
