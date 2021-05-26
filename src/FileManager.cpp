@@ -90,7 +90,7 @@ void FileManager::write(string filename, const Vector&  v1, const Vector&  v2)
 	stream = fopen(filename.c_str(), "w");
 	for(int i = 0; i< v1.size(); ++i )
 	{
-		fprintf(stream, "%f %f\n", v1[i], v2[i]);
+		fprintf(stream, "%.8f %.8f\n", v1[i], v2[i]);
 	}
 	fclose(stream);
 }
@@ -312,17 +312,6 @@ void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 	//Read data and column indices
 	long int nNon0 = *(indptr.end()-1); //number of non zero elements
 
-//	std::cout<<"Reading data..."<<"mem: " << mem()<<"; nonzeros "<<nNon0<<std::endl;
-//	std::ifstream ifile3(fdata.c_str(), std::ios::in);
-//	if (!ifile3.is_open()) {
-//        std::cerr << "There was a problem opening the data file!\n";
-//        exit(1);//exit or do additional error checking
-//    }
-//	std::ifstream ifile2(findices.c_str(), std::ios::in);
-//	if (!ifile2.is_open()) {
-//        std::cerr << "There was a problem opening the indices file!\n";
-//        exit(1);//exit or do additional error checking
-//    }
 	FILE *stream3;
 	stream3 = fopen(fdata.c_str(), "r");
 	FILE *stream2;
@@ -340,10 +329,12 @@ void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 
 	processStatus("Reserving sparse matrix space..." );
 
+	//allocate space for all nonzero element + additional N,
+	//in case any diag element is zero
 	hessian.reserve( nNon0 + N);
+
 	processStatus(string("Reserving sparse matrix space...finished    mem: ") + mem());
-	vector<double> vdata;
-	vector<long int> vindices;
+
 	long int nel=0;
 	int percent = 2;
 	processStatus("Reading Hessian from csr....");
@@ -352,29 +343,31 @@ void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 		rowLen = indptr[i+1] - indptr[i];
 
 		hessian.startVec(i);
+		bool diag_zero = true;
+
 		if(rowLen == 0)
-			hessian.insertBack( i, i ) =  0.0f ;
+			hessian.insertBack( i, i ) =  0.00f ;
 		for (int j =0;j <rowLen;++j)
 		{
-			//if(fscanf(stream3, "%f", &dataval) == EOF)  perror (("Error: datafile["+ fdata +"] has too few elements").c_str());
-			//if(fscanf(stream2, "%d", &indval) == EOF)  perror (("Error: indicesfile["+ findices +"] has too few elements (must be "+to_string(nNon0)+")").c_str());
+
 			fscanf(stream3, "%lf", &dataval);
 			fscanf(stream2, "%ld", &indval);
-//			ifile3 >> dataval;
-//			ifile2 >> indval;
 
+			if(i == indval-1)
+				diag_zero = false;
+			if(indval-1>i && diag_zero)
+			{
+				hessian.insertBack( i, i ) =  0.00f ;
+				nel++;
+				diag_zero = false;
+			}
 			hessian.insertBack( i, indval-1) =  dataval ;
 			nel++;
 		}
 		double p = double(nel)/nNon0;
-//		if( int(100*p) > percent || i == N/2 )
-//		{
-//
-//			std::cout<<100*p<< "% (value, index) = ("<<dataval<<", "<<indval<< "); mem: " << mem()<< "\n";
-//			std::cout.flush();
+
 		processRunningStatus(p);
-//			percent++;
-//		}
+
 	}
 	processEnded();
 	hessian.finalize();
