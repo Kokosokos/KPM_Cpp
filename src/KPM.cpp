@@ -29,9 +29,9 @@ using namespace Spectra;
 //	readCSR();
 //}
 
-KPM::KPM(sMatrix& hessian,  unsigned int K, unsigned int R, float nuEdge): m_R(R), m_nuEdge(nuEdge),m_hessian(hessian)
+KPM::KPM(sMatrix& hessian,  unsigned int K, unsigned int R, float nuEdge, MPI_Comm inworld, string kernel, int lkernel): m_R(R), m_nuEdge(nuEdge),m_hessian(hessian), m_world(inworld)
 {
-	setK(K);
+	setK(K, kernel, lkernel );
 	m_DOF = m_hessian.cols();
 }
 
@@ -119,10 +119,14 @@ float KPM::getEmax() const
 	return m_emax;
 }
 
-void KPM::setK(unsigned int K)
+void KPM::setK(unsigned int K, string kernel, int lkernel)
 {
 	m_K = K;
-	jacksonKernel(K);
+	//Jackson kernel
+	if(kernel == "jk")
+		jacksonKernel(K);
+	if(kernel == "lk")
+		lorentzKernel(K, lkernel);
 }
 
 void KPM::setR(unsigned int R)
@@ -158,7 +162,7 @@ double KPM::bScaling()
 void KPM::ETilde(Vector& e)
 {
 	if(e.maxCoeff() > m_emax || e.minCoeff() < m_emin)
-		std::cout << "WARNING: Requested output frequencies are not in range of [emin,emax].\n";
+		processStatus( string("WARNING: Requested output frequencies are not in range of [emin,emax].\n"));
 	const double a(aScaling());
 	const double  b(bScaling());
 
@@ -170,9 +174,10 @@ void KPM::HTilde()
 	double  a = aScaling();
 	double  b = bScaling();
 
-	std::cout<<"Diagonal size: "<<m_hessian.diagonal().rows()<<"; non zeros = "<< m_hessian.diagonal().nonZeros()<<std::endl;
-	m_hessian.diagonal() -= b*ones(m_hessian.rows());
+	processStatus( string("Diagonal size: ") + to_string(m_hessian.diagonal().rows()) + string("; non zeros = ") +  to_string(m_hessian.diagonal().nonZeros()) ) ;
+	m_hessian.diagonal() -= b*ones(m_hessian.rows());//Can cause error if not all diagonal elements exist
 	m_hessian /= a;
+	processStatus( string("Hessian rescale finished"));
 
 }
 
@@ -185,24 +190,52 @@ void KPM::jacksonKernel(int K)
 	m_jk += sin(c_PI*n/(K+1))/tan(c_PI/(K+1)) ;
 	m_jk *= (1.0/(K+1));
 }
-
-
-Vector KPM::getCoeffDOS()
+void KPM::lorentzKernel(int K, int parameter )
 {
+	Vector n = arange(K);
+	m_jk = sinh(parameter*(ones(n.size())-n/K))/sinh(parameter);
+
+}
+
+//def jacksonKernel(n,N):
+//	jK_func=1.0/(N+1) * ((N-n+1)*np.cos(np.pi*n/(N+1)) + np.sin(np.pi*n/(N+1))/np.tan(np.pi/(N+1)))
+//	return jK_func
+//
+//def lorentzKernel(n,N,parameter):
+//	lK_func=np.sinh(parameter*(1-n/N))/np.sinh(parameter)
+//	return lK_func
+
+Vector KPM::getCoeffDOS(int chebKind)
+{
+//	FileManager fmanager;
 	Vector loc_gP = zeros(m_K); // gauss projection
 	Vector glob_gP = zeros(m_K); // gauss projection
 	int rank;
 	int size;
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Comm_rank(m_world, &rank);
+	MPI_Comm_size(m_world, &size);
 
+	int out=0;
+
+	if (!(chebKind == 1 || chebKind == 2))
+	{
+		processStatus(string("ERROR: chebKind must be 1 or 2" + chebKind));
+	}
 	for (int r = rank; r < m_R; r+=size)
 	{
-		if (r % 10 == 0)
+		if (100 * r / m_R > out )
+		{
 			processRunningStatus(float(r)/m_R);
+			out+=10;
+		}
 
+//		Vector v_r = uniform(m_DOF);
 		Vector v_r = normal(m_DOF);
 		v_r=v_r/v_r.norm();
+		if (r<2)
+		{
+//			fmanager.write("u"+to_string(r), v_r);
+		}
 		Vector polyChebCurr = v_r;
 		Vector polyChebPrevPrev = v_r;
 		Vector polyChebPrev = v_r;
@@ -210,7 +243,7 @@ Vector KPM::getCoeffDOS()
 		loc_gP[0] += v_r.transpose() * polyChebCurr;
 
 		//k = 1
-		polyChebCurr = 2 * m_hessian * polyChebPrev;
+		polyChebCurr = chebKind * m_hessian * polyChebPrev;
 		polyChebPrevPrev = polyChebPrev;
 		polyChebPrev = polyChebCurr;
 
@@ -228,20 +261,20 @@ Vector KPM::getCoeffDOS()
 		}
 	}
 	processEnded();
-	MPI_Reduce(loc_gP.data(), glob_gP.data(), m_K, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+	MPI_Reduce(loc_gP.data(), glob_gP.data(), m_K, MPI_DOUBLE, MPI_SUM, 0, m_world);
 	return glob_gP;
 }
 
 Vector KPM::getCoeffGammaDOS()
 {
-	FileManager fmanager;
+//	FileManager fmanager;
 	Vector loc_gP = zeros(m_K); // gauss projection
 	Vector glob_gP = zeros(m_K); // gauss projection
 
 	int rank=0;
 	int size;
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Comm_rank(m_world, &rank);
+	MPI_Comm_size(m_world, &size);
 	if(rank==0)
 		cout <<"MPI size:"<< size<<endl;
 	for (int r = rank; r < m_R; r+=size)
@@ -284,24 +317,113 @@ Vector KPM::getCoeffGammaDOS()
 		}
 	}
 	processEnded();
-	MPI_Reduce(loc_gP.data(), glob_gP.data(), m_K, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+	MPI_Reduce(loc_gP.data(), glob_gP.data(), m_K, MPI_DOUBLE, MPI_SUM, 0, m_world);
 	cout<<"rank: "<<rank<<". loc: "<<loc_gP[0]<<". glob: "<<glob_gP[0]<<endl;
 	return glob_gP;
 }
 
-Vector KPM::sumSeries(const Vector& freq, const Vector& gP)
+Vector KPM::getKArray(float dfreq)
+{
+	processStatus("L");
+//	FileManager fmanager;
+	int L = (sqrt(m_emax) +sqrt(-m_emin))/dfreq;
+	processStatus("freq");
+	Vector freq = arange(L,-sqrt(abs(m_emin)), sqrt(m_emax));
+//	fmanager.write("K.array.freq.dat", freq);
+	processStatus("a");
+	float a = (c_PI/(2.0*(m_emax - m_emin)*dfreq));
+//	fmanager.write("K.array.a.dat", a);
+	processStatus("b");
+	Vector b = pow(2-m_nuEdge, 2)*sqr(2.0*freq-ones(freq.size())*(m_emax + m_emin));
+//	fmanager.write("K.array.b.dat", b);
+	processStatus("c");
+	Vector c = pow(m_emax - m_emin,2)*ones(freq.size());
+//	fmanager.write("K.array.c.dat", c);
+	processStatus("return");
+	return  a * sqrt( c - b );
+}
+Vector KPM::getKArray(const Vector& freq)
+{
+//	return (m_emax-m_emin)*freq.cwiseInverse()/2/m_DOF;
+	int Kmin = 250;
+	return (m_emax-m_emin)*abs(freq.cwiseInverse())/2/6000 + Kmin*ones(freq.size());// /m_DOF
+}
+Vector KPM::getSpreading(Vector freq)
+{
+	return (c_PI/(2.0*(m_emax - m_emin)*m_K)) * sqrt(pow(m_emax - m_emin,2)*ones(freq.size()) - pow(2-m_nuEdge, 2)*sqr(2.0*freq-ones(freq.size())*(m_emax + m_emin)));
+}
+
+//Vector KPM::sumSeries(const Vector& freq, const Vector& gP, int chebKind)
+//{
+//	Vector sumKPM = zeros(freq.size());
+//	Vector e = sign(freq).cwiseProduct(sqr(freq));
+//	FileManager fmanager;
+//	ETilde(e);
+//	Vector	arccosArgument	= arccos(e);
+//	Vector 	prefactor = ones(freq.size());
+////	Vector K = getKArray(abs(freq[1]-freq[0]));
+//	Vector K = getKArray(freq);
+//
+//	//Vector 	prefactor		= 4*abs(freq)*abs((2.0-m_nuEdge)/c_PI/(m_emax-m_emin));
+//	if(chebKind == 2)
+//	{
+////		prefactor  = 4*abs(freq)*abs((2.0-m_nuEdge)/c_PI/(m_emax-m_emin));
+//		prefactor  = 4*sqrt(sqr(freq)+pow(c_PI/m_K/2, 2)*m_emax*ones(freq.size())) * abs((2.0-m_nuEdge)/c_PI/(m_emax-m_emin));
+//
+//	}
+//	else
+//	{
+//		prefactor  =  2*abs(freq)*abs((2.0-m_nuEdge)/c_PI/(m_emax-m_emin));
+//		prefactor = prefactor.cwiseProduct( (sqrt(ones(e.size()) - sqr(e))).cwiseInverse() );
+//	}
+//	int cof = 1;
+//	std::cout<<"R======"<<m_R<<std::endl;
+//
+//	for(int i=0;i< freq.size();++i)
+//	{
+//		K[i] = K[i]<m_K?int(K[i]):m_K;
+//		for ( int k = 0; k < K[i]; ++k)
+//		{
+//			if(chebKind == 2)
+//				sumKPM[i]			+= prefactor[i]*( m_jk[k]*gP[k]/m_R)  * sin((k + 1.0) * arccosArgument[i]);
+//			else
+////				sumKPM[i]			+= cof*prefactor[i]( m_jk[k]*gP[k]/m_R)  * cos((k) * arccosArgument[i]);
+//
+//			cof = 2;
+//		}
+//	}
+//	fmanager.write("K.array.dat", K);
+//	return sumKPM;
+//}
+Vector KPM::sumSeries(const Vector& freq, const Vector& gP, int chebKind)
 {
 	Vector sumKPM = zeros(freq.size());
 	Vector e = sign(freq).cwiseProduct(sqr(freq));
 	ETilde(e);
 	Vector	arccosArgument	= arccos(e);
-	Vector 	prefactor		= 4*abs(freq)*abs((2.0-m_nuEdge)/c_PI/(m_emax-m_emin));
-	std::cout<<"R======"<<m_R<<std::endl;
+	Vector 	prefactor = ones(freq.size());
+	//Vector 	prefactor		= 4*abs(freq)*abs((2.0-m_nuEdge)/c_PI/(m_emax-m_emin));
+	if(chebKind == 2)
+	{
+//		prefactor  = 4*abs(freq)*abs((2.0-m_nuEdge)/c_PI/(m_emax-m_emin));
+		prefactor  = 4*sqrt(sqr(freq)+pow(c_PI/m_K/2, 2)*m_emax*ones(freq.size())) * abs((2.0-m_nuEdge)/c_PI/(m_emax-m_emin));
+
+	}
+	else
+	{
+		prefactor  =  2*abs(freq)*abs((2.0-m_nuEdge)/c_PI/(m_emax-m_emin));
+		prefactor = prefactor.cwiseProduct( (sqrt(ones(e.size()) - sqr(e))).cwiseInverse() );
+	}
+	int cof = 1;
+
 	for ( int k =0; k < m_K; ++k)
 	{
+		if(chebKind == 2)
+			sumKPM			+= prefactor.cwiseProduct(( m_jk[k]*gP[k]/m_R)  * sin((k + 1.0) * arccosArgument));
+		else
+			sumKPM			+= cof*prefactor.cwiseProduct(( m_jk[k]*gP[k]/m_R)  * cos((k) * arccosArgument));
 
-		sumKPM			+= prefactor.cwiseProduct(( m_jk[k]*gP[k]/m_R)  * sin((k + 1.0) * arccosArgument));
-
+		cof = 2;
 	}
 	return sumKPM;
 }

@@ -1,0 +1,4 @@
+LAMMPS (8 Apr 2021)
+kj
+ERROR: Unknown command: kj (../input.cpp:272)
+Last command: kj

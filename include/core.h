@@ -67,6 +67,11 @@ inline Vector arccos(Vector v)
 	return Eigen::acos(v.array());
 }
 
+inline  Vector sinh(Vector v)
+{
+	return Eigen::sinh(v.array());
+}
+
 inline Vector sign(Vector v)
 {
 	return v.array().sign();
@@ -76,7 +81,10 @@ inline Vector sqr(Vector v)
 {
 	return v.array().square();
 }
-
+inline Vector sqrt(Vector v)
+{
+	return v.array().sqrt();
+}
 inline Vector abs(Vector v)
 {
 	return v.array().abs();
@@ -115,12 +123,30 @@ template <typename T> int sgn(T val) {
 auto normalrnd = [](float mean, float sigma)
 {
     auto randomFunc = [distribution_ = std::normal_distribution<>(mean, sigma),
-                       random_engine_ = std::mt19937{ std::random_device{}() }]() mutable
+                       random_engine_ = std::mt19937_64{ std::random_device{}() }]() mutable
     {
         return distribution_(random_engine_);
     };
     return randomFunc;
 };
+
+auto uniformrnd = [](float min,  float max)
+{
+    auto randomFunc = [distribution_ = std::uniform_real_distribution<>(min, max),
+                       random_engine_ = std::mt19937_64{ std::random_device{}() }]() mutable
+    {
+        return distribution_(random_engine_);
+    };
+    return randomFunc;
+};
+inline Vector uniform( unsigned int nn)
+{
+
+	std::vector<double> numbers;
+//	Vector res(nn);
+	std::generate_n(std::back_inserter(numbers), nn, uniformrnd(-2.0, 2.0));
+	return  Vector::Map(numbers.data(), numbers.size());
+}
 
 inline Vector normal( unsigned int nn)
 {
@@ -153,6 +179,8 @@ inline void processRunningStatus(float progress)
 		std::cout.flush();
 	}
 }
+
+
 inline void processStatus( std::string message)
 {
 	int rank;
@@ -162,6 +190,7 @@ inline void processStatus( std::string message)
 	if(rank == 0)
 	{
 		std::cout << message<< std::endl;
+		std::cout.flush();
 	}
 }
 
@@ -179,6 +208,19 @@ inline void processEnded()
 
 }
 
+inline std::vector<unsigned int>	trueIndexes( const std::vector<bool> &vector )
+{
+	std::vector<unsigned int>	indices;
+
+	auto it = std::find_if(std::begin(vector), std::end(vector), [](bool element){return element;});
+	while (it != std::end(vector)) {
+	   indices.emplace_back(std::distance(std::begin(vector), it));
+	   it = std::find_if(std::next(it), std::end(vector), [](bool element){return element;});
+	}
+	indices.shrink_to_fit();
+
+	return	indices;
+} // end function trueIndexes
 
 
 #endif /* __CORE_H_ */

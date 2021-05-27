@@ -1,6 +1,12 @@
 //
 // Created by charlie sievers on 6/21/18.
 //
+#include "KPM.h"
+#include "FileManager.h"
+
+const char* c_fdata    = "H.data.dat";
+const char* c_findices = "H.indices.dat";
+const char* c_findptr  = "H.indptr.dat";
 
 #include <mpi.h>
 #include <cmath>
@@ -26,12 +32,13 @@
 #include "finish.h"
 #include <algorithm>
 
+
 using namespace LAMMPS_NS;
-enum{REGULAR,ESKM};
+enum{REGULAR,ESKM,DOS};
 
 /* ---------------------------------------------------------------------- */
 
-DynamicalMatrix::DynamicalMatrix(LAMMPS *lmp) : Pointers(lmp), fp(NULL)
+DynamicalMatrix::DynamicalMatrix(LAMMPS *lmp) : Pointers(lmp), fp(NULL), m_hcut(0.00001)
 {
     external_force_clear = 1;
 }
@@ -40,9 +47,10 @@ DynamicalMatrix::DynamicalMatrix(LAMMPS *lmp) : Pointers(lmp), fp(NULL)
 
 DynamicalMatrix::~DynamicalMatrix()
 {
-    if (fp && me == 0) fclose(fp);
+	if(file_opened)
+		closefile();
     memory->destroy(groupmap);
-    fp = NULL;
+
 }
 
 /* ----------------------------------------------------------------------
@@ -67,8 +75,14 @@ void DynamicalMatrix::setup()
     domain->image_check();
     domain->box_too_small_check();
     neighbor->build(1);
-
+    /*neighbor->ncalls = 0;
+    neighbor->every = 2;                       // build every this many steps
+    neighbor->delay = 1;
+    neighbor->ago = 0;
+    neighbor->ndanger = 0;
+	*/
     // compute all forces
+	if (force->kspace){   force->kspace->setup();   };
     external_force_clear = 0;
     eflag=0;
     vflag=0;
@@ -105,7 +119,7 @@ void DynamicalMatrix::command(int narg, char **arg)
 
     // group and style
 
-    igroup = group->find(arg[0]);
+    igroup = group->find(arg[0]); //no need for KPM
     if (igroup == -1) error->all(FLERR,"Could not find dynamical matrix group ID");
     groupbit = group->bitmask[igroup];
     gcount = group->count(igroup);
@@ -116,24 +130,31 @@ void DynamicalMatrix::command(int narg, char **arg)
     int style = -1;
     if (strcmp(arg[1],"regular") == 0) style = REGULAR;
     else if (strcmp(arg[1],"eskm") == 0) style = ESKM;
+    else if (strcmp(arg[1],"dos") == 0) style = DOS;
     else error->all(FLERR,"Illegal Dynamical Matrix command");
-    del = force->numeric(FLERR, arg[2]);
+
+    if(style != DOS)
+    	del = utils::numeric(FLERR, arg[2],false,lmp); // no need for dos
 
     // set option defaults
-
+//    error->warning(FLERR,string("STYLE: ")+string(arg[1]));
     binaryflag = 0;
+	sparseflag=0;
     scaleflag = 0;
+	csrflag=0;
     compressed = 0;
     file_flag = 0;
     file_opened = 0;
     conversion = 1;
-
+	m_indptr=0;
+	kpm_dos_flag=1;
     // read options from end of input line
-    if (style == REGULAR) options(narg-3,&arg[3]);  //COME BACK
+    if (style == REGULAR) options(narg-3,&arg[3]);   //COME BACK
     else if (style == ESKM) options(narg-3,&arg[3]); //COME BACK
+    else if (style == DOS) ;  //COME BACK
     else if (comm->me == 0 && screen) fprintf(screen,"Illegal Dynamical Matrix command\n");
 
-    if (atom->map_style == 0)
+    if (atom->map_style == Atom::MAP_NONE)
       error->all(FLERR,"Dynamical_matrix command requires an atom map, see atom_modify");
 
     // move atoms by 3-vector or specified variable(s)
@@ -155,7 +176,41 @@ void DynamicalMatrix::command(int narg, char **arg)
         calculateMatrix();
         timer->barrier_stop();
     }
+    if(file_opened)
+    	closefile();
+    if(style == DOS)//Calculate DOS if "flagged"
+    {
+    	if (narg-2 < 2) error->all(FLERR,"ERROR: Please provide KPM parameters: K, R");
 
+//    	openCSR();
+    	FileManager fmanager;
+//    	vector<string> csrFiles;
+		sMatrix hessian;
+    	fmanager.readCSR(c_fdata, c_findices, c_findptr, hessian);
+    	string kernel = "jk";
+    	string resFile = "DOS.lmp.dat";
+    	string gpFile = "gpDOS.lmp.dat";
+    	int K = utils::inumeric(FLERR, arg[2],false,lmp);//4000
+    	int R = utils::inumeric(FLERR, arg[3],false,lmp);//30
+    	float epsilon = 0.05;
+    	KPM kpm( hessian, K, R , epsilon, world, kernel);
+    	kpm.findEmax();
+    	kpm.findEmin();
+    	float emax = kpm.getEmax();
+    	float emin = kpm.getEmin();
+    	kpm.HTilde();
+
+    	Vector gp  = zeros(kpm.getK());
+    	gp = kpm.getCoeffDOS();
+    	if (me == 0)
+    		fmanager.write(gpFile,gp);
+    	Vector freq = arange(1000, sgn(emin)*sqrt(fabs(emin)), sqrt(emax));
+
+    	Vector res = kpm.sumSeries(freq, gp);
+    	if (me == 0)
+    		fmanager.write(resFile,freq, res);
+//    	closefile();
+    }
     Finish finish(lmp);
     finish.end(1);
 }
@@ -185,19 +240,77 @@ void DynamicalMatrix::options(int narg, char **arg)
             filename = arg[iarg + 1];
             file_flag = 1;
             iarg += 2;
-        } else error->all(FLERR,"Illegal dynamical_matrix command");
+        }
+		  else if (strcmp(arg[iarg],"sparse") == 0) {
+            if (iarg+2 > narg) error->all(FLERR, "Illegal dynamical_matrix command");
+            if (strcmp(arg[iarg+1],"yes") == 0) {
+                sparseflag = 1;
+				file_flag=1;
+            }
+            else if (strcmp(arg[iarg+1],"no") == 0) {
+                sparseflag = 0;
+            }
+            iarg += 2;
+        }
+		 else if (strcmp(arg[iarg],"csr") == 0) {
+            if (iarg+2 > narg) error->all(FLERR, "Illegal dynamical_matrix command");
+            if (strcmp(arg[iarg+1],"yes") == 0) {
+				
+                csrflag = 1;
+//				file_flag=1;
+				openCSR();
+            }
+            else if (strcmp(arg[iarg+1],"no") == 0) {
+                csrflag = 0;
+            }
+            iarg += 2;
+        }
+		 else if (strcmp(arg[iarg],"cut") == 0) {
+			 if (iarg+2 > narg) error->all(FLERR, "Please provide Hessian cutoff");
+			 m_hcut = utils::numeric(FLERR, arg[iarg + 1],false,lmp);
+//			 m_hcut = float(arg[iarg + 1]);
+			 iarg += 2;
+		 }
+		else error->all(FLERR,"Illegal dynamical_matrix command");
     }
     if (file_flag == 1) {
         openfile(filename);
     }
 }
 
+void DynamicalMatrix::kpmOptions(int narg, char **arg)
+{
+	if (narg < 0) error->all(FLERR,"Illegal dynamical_matrix command");
+	int iarg = 0;
+	while (iarg < narg) {
+	        if (strcmp(arg[iarg],"binary") == 0) {
+	            if (iarg + 2 > narg) error->all(FLERR, "Illegal dynamical_matrix command");
+	            if (strcmp(arg[iarg+1],"gzip") == 0) {
+	                compressed = 1;
+	            }
+	            else if (strcmp(arg[iarg+1],"yes") == 0) {
+	                binaryflag = 1;
+	            }
+	            iarg += 2;
+	        }
+	        else error->all(FLERR,"Illegal kpm parameter");
+	}
+}
 /* ----------------------------------------------------------------------
    generic opening of a file
    ASCII or binary or gzipped
    some derived classes override this function
 ------------------------------------------------------------------------- */
+void DynamicalMatrix::openCSR()
+{
+	fp_data    = fopen(c_fdata,"w");
+	fp_indptr  = fopen(c_findptr,"w");
+	fprintf(fp_indptr, "%d\n", 0); //first element of indptr is always 0
+	fp_indices = fopen(c_findices,"w");
+	file_opened = 1;
+	if (csrflag && fp_data == NULL && fp_indptr == NULL && fp_indices == NULL) error->one(FLERR,"Cannot open dump file");
 
+}
 void DynamicalMatrix::openfile(const char* filename)
 {
     // if file already opened, return
@@ -219,14 +332,33 @@ void DynamicalMatrix::openfile(const char* filename)
     } else if (binaryflag) {
         fp = fopen(filename,"wb");
     } else {
-        fp = fopen(filename,"w");
+        if(!csrflag)
+			fp = fopen(filename,"w");
+		else
+		{
+			openCSR();
+		}
     }
 
-    if (fp == NULL) error->one(FLERR,"Cannot open dump file");
+    if (!csrflag && fp == NULL) error->one(FLERR,"Cannot open dump file");
 
     file_opened = 1;
 }
-
+void DynamicalMatrix::closefile()
+{
+    if (fp && me == 0) fclose(fp);
+    if( fp_data && fp_indptr && fp_indices && me==0)
+	{
+		fclose(fp_data);
+		fclose(fp_indptr);
+		fclose(fp_indices);
+	}
+    fp = NULL;
+	fp_data = NULL;
+    fp_indices = NULL;
+    fp_indptr = NULL;
+    file_opened = 0;
+}
 /* ----------------------------------------------------------------------
    create dynamical matrix
 ------------------------------------------------------------------------- */
@@ -259,6 +391,8 @@ void DynamicalMatrix::calculateMatrix()
         fprintf(screen,"  Total # of atoms = " BIGINT_FORMAT "\n", natoms);
         fprintf(screen,"  Atoms in group = " BIGINT_FORMAT "\n", gcount);
         fprintf(screen,"  Total dynamical matrix elements = " BIGINT_FORMAT "\n", (dynlen*dynlen) );
+        if(csrflag)
+			fprintf(screen,"  CSR flag is active\n" );
     }
 
     // emit dynlen rows of dimalpha*dynlen*dimbeta elements
@@ -303,7 +437,14 @@ void DynamicalMatrix::calculateMatrix()
         for (int k=0; k<3; k++)
             MPI_Reduce(dynmat[k],fdynmat[k],dynlen,MPI_DOUBLE,MPI_SUM,0,world);
         if (me == 0)
-            writeMatrix(fdynmat);
+		{
+			if(csrflag)
+            	writeMatrixCSR(fdynmat,i);
+			else if (sparseflag)
+            	writeMatrixSparse(fdynmat,i);
+			else
+				writeMatrix(fdynmat);
+		}
         dynmat_clear(dynmat);
         if (comm->me == 0 && screen) {
             int p = 10 * gm[i-1] / gcount;
@@ -328,6 +469,45 @@ void DynamicalMatrix::calculateMatrix()
 }
 
 /* ----------------------------------------------------------------------
+ *   write dynamical matrix in CSR matrix format
+ *      --------------------------------------------------------------------- */
+
+void DynamicalMatrix::writeMatrixCSR(double **dynmat, int irow)
+{
+    if (me != 0 || !fp_data || !fp_indptr || !fp_indices)
+        return;
+
+    //clearerr(fp);
+    if (binaryflag)
+    {
+      error->one(FLERR, "Error: Cannot Use binary flag with csr flag");
+    }
+	else 
+	{
+        for (int i = 0; i < 3; i++) {
+        for (bigint j = 0; j < dynlen; j++) {
+                //if (dynmat[i][j] != 0.0f)
+                if (dynmat[i][j] > m_hcut || dynmat[i][j] < -m_hcut)
+				{
+		//			fprintf(screen,"  CSR el: %4.8f\n", dynmat[i][j] );
+                   	fprintf(fp_data, "%4.4f\n",dynmat[i][j]);		
+                   	fprintf(fp_indices, "%ld\n",int(j/3)*3+1+(j%3));
+					m_indptr++;
+				}
+            }
+		fprintf(fp_indptr, "%ld\n",m_indptr);
+        }
+
+        if (ferror(fp_data) || ferror(fp_indices) || ferror(fp_indptr))
+            error->one(FLERR,"Error writing to file");
+		fflush(fp_data);
+		fflush(fp_indptr);
+		fflush(fp_indices);
+    }
+}
+
+
+/* ----------------------------------------------------------------------
    write dynamical matrix
 ------------------------------------------------------------------------- */
 
@@ -347,6 +527,30 @@ void DynamicalMatrix::writeMatrix(double **dynmat)
             for (bigint j = 0; j < dynlen; j++) {
                 if ((j+1)%3==0) fprintf(fp, "%4.8f\n", dynmat[i][j]);
                 else fprintf(fp, "%4.8f ",dynmat[i][j]);
+            }
+        }
+        if (ferror(fp))
+            error->one(FLERR,"Error writing to file");
+    }
+}
+/* ----------------------------------------------------------------------
+  write dynamical matrix in Python sparse matrix exluding 0.0 values
+   --------------------------------------------------------------------- */
+
+void DynamicalMatrix::writeMatrixSparse(double **dynmat, int irow)
+{
+    if (me != 0 || !fp)
+        return;
+
+    clearerr(fp);
+    if (binaryflag)
+	{
+      error->one(FLERR, "Error: Cannot Use binary flag with sparse flag");
+    } else {
+        for (bigint j = 0; j < dynlen; j++) {
+        for (int i = 0; i < 3; i++) {
+				if (dynmat[i][j] != 0.0f)
+    	        	fprintf(fp, "%d %ld %4.8f\n",(irow-1)*3+1+i, int(j/3)*3+1+(j%3),dynmat[i][j]);
             }
         }
         if (ferror(fp))
@@ -392,7 +596,7 @@ void DynamicalMatrix::update_force()
         force->pair->compute(eflag,vflag);
         timer->stamp(Timer::PAIR);
     }
-    if (atom->molecular) {
+    if (atom->molecular != Atom::ATOMIC) {
         if (force->bond) force->bond->compute(eflag,vflag);
         if (force->angle) force->angle->compute(eflag,vflag);
         if (force->dihedral) force->dihedral->compute(eflag,vflag);

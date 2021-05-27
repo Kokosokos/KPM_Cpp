@@ -13,6 +13,9 @@ CommandStyle(dynamical_matrix,DynamicalMatrix)
 
 #include "pointers.h"
 
+//class A;
+//typedef sMatrix A;
+
 namespace LAMMPS_NS {
 
     class DynamicalMatrix : protected Pointers {
@@ -38,13 +41,17 @@ namespace LAMMPS_NS {
         void update_force();
         void force_clear();
         virtual void openfile(const char* filename);
-
+        void openCSR();
+        virtual void closefile();
     private:
         void options(int, char **);
+        void kpmOptions(int, char **);
         void calculateMatrix();
         void dynmat_clear(double **dynmat);
         void create_groupmap();
         void writeMatrix(double **dynmat);
+		void writeMatrixCSR(double **dynmat, int ni);
+		void writeMatrixSparse(double **dynmat, int ni);
         void convert_units(const char *style);
         void displace_atom(int local_idx, int direction, int magnitude);
 
@@ -62,10 +69,21 @@ namespace LAMMPS_NS {
 
         int compressed;            // 1 if dump file is written compressed, 0 no
         int binaryflag;            // 1 if dump file is written binary, 0 no
+		int sparseflag;				// 0 if u want to use dense matrix output, 1 - for python sparse matrix
+		int csrflag;
+
         int file_opened;           // 1 if openfile method has been called, 0 no
         int file_flag;             // 1 custom file name, 0 dynmat.dat
 
+        int kpm_dos_flag;
         FILE *fp;
+
+			
+        FILE *fp_data;
+        FILE *fp_indptr;
+        FILE *fp_indices;
+		bigint m_indptr;
+		float m_hcut;
     };
 }
 
