@@ -1,0 +1,36 @@
+#0) Add workspace path
+export workspace=~/eclipse-workspace/KPM
+#1) add mpi path
+mpibin=$(which mpic++) #locat mpi
+export mpiinclude=$(dirname $mpibin)/../include #== /opt/ohpc/pub/mpi/mpich-gnu8-ohpc/3.3.1/include/
+
+#2) Add boost path
+export boostinclude=/usr/include/boost
+
+#3) Add spectra and eigen path
+export spectradir=/mnt/data1/home/PostDoc2/spectra/include
+export eigendir=/mnt/data1/home/PostDoc2/eigen/
+
+#3) Add path to LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/eclipse-workspace/KPM/ReleaseMPILib # to run KPM after
+#!!!!better add it to ~/.bashrc since it is needed upon runtime
+#4) build libKPM.so
+#Compile
+mkdir $workspace/ReleaseMPILib
+cd $workspace/ReleaseMPILib
+for f in ../src/*.cpp;
+do
+	ff=$(basename $f .cpp);
+	mpic++ -I"$workspace/include" -I$boostinclude -I$eigendir -I$spectradir/ -I$mpiinclude -O3 -Wall -c -fmessage-length=0 -fPIC -MMD -MP -MF"$ff.d" -MT"$ff.d" -o "$ff.o" "../src/$ff.cpp"
+done
+#Linker
+#mpic++ -lboost_program_options -o KPM ../src/*o
+mpic++ -L$locallibdir/lib  -fopenmp -shared -o libKPM.so *.o  -lboost_program_options
+#5) Add KPM path to LAMMPS
+#Modify  KPM_PATH in lammps-dev/src/MAKE/Makefile.mpi 
+KPM_PATH =       -L/home/ivan/eclipse-workspace/KPM/ReleaseMPILib/ -I/mnt/data1/home/PostDoc2/spectra/include/ -I/mnt/data1/home/PostDoc2/eigen/ -I/home/ivan/eclipse-workspace/KPM/include/
+#go to lammps-dev/src/ and run 
+make -j 4 mpi
+#6) Use in lamms (modify Hessian.lmp)
+dynamical_matrix all eskm 0.0001 csr yes cut 100 #Calculate hessian with cutoff of values
+dynamical_matrix all dos #calculate vDOS
