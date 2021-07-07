@@ -19,6 +19,9 @@ core
 /test_10k/
 /test_10k_aws/
 /test_CG/
+/test_CG2/
 /test_atom/
 /test_atom_2k/
 /ReleaseMPILib/
+
+/lammps-dev/src/lmp_*
