@@ -146,7 +146,8 @@ float FileManager::readLAMMPSData(string filename, Vector& minvSqrt)
 	int N=0; // number of atoms
 	vector<double> masses;
 	vector<int> massIds;
-	vector<double> massesFull;
+	vector<double> massesFull; //create mass_per_atom*3 vector
+
 	float Vol = 0.0f;
 	float Lx = 0.0f;
 	float Ly = 0.0f;
@@ -226,6 +227,7 @@ float FileManager::readLAMMPSData(string filename, Vector& minvSqrt)
 
 
 
+
 		if (line.find("Masses", 0) != string::npos)
 		{
 			getline(fileInput, line);
@@ -246,11 +248,14 @@ float FileManager::readLAMMPSData(string filename, Vector& minvSqrt)
 
 		}
 //ADD sorting
+		massIds = vector<int>(N);
+		massesFull = vector<double>(3*N); //create mass_per_atom*3 vector
 		if (line.find("Atoms", 0) != string::npos)
 		{
 			getline(fileInput, line);
 
 			int mid=0;
+			int aid=0; //atom id (for sort)
 			for (int i =0; i < N; ++i)
 			{
 				getline(fileInput, line);
@@ -261,13 +266,21 @@ float FileManager::readLAMMPSData(string filename, Vector& minvSqrt)
 
 				iss =  std::istringstream(results[2]);
 				iss>>mid;
-				massIds.push_back(mid);
+				mid = mid - 1;
+				iss =  std::istringstream(results[0]);
+				iss>>aid;
+				aid = aid-1;//since lammps counts starting from 1
+				massIds[aid] = mid ;
 
 				//Dimensionality == 3
-				double minvsqrt = 1.0 / sqrt(masses[mid-1]);
-				massesFull.push_back(minvsqrt);
-				massesFull.push_back(minvsqrt);
-				massesFull.push_back(minvsqrt);
+				double minvsqrt = 1.0 / sqrt(masses[mid]);
+				massesFull[aid*3 + 0] = minvsqrt;
+				massesFull[aid*3 + 1] = minvsqrt;
+				massesFull[aid*3 + 2] = minvsqrt;
+				if(aid >= N)
+					processStatus(string("ERROR: FileManager::readLAMMPSData: aid >= N: ") +to_string(aid)+string(" ")+to_string(N));
+				if(mid >= nM)
+					processStatus(string("ERROR: FileManager::readLAMMPSData: mid >= nM: ") +to_string(mid)+string(" ")+to_string(nM));
 			}
 			break;
 		}
@@ -275,7 +288,7 @@ float FileManager::readLAMMPSData(string filename, Vector& minvSqrt)
 
 	//	m_M = Vector::Map(massesFull.data(), massesFull.size());
 	minvSqrt = Vector::Map(massesFull.data(), massesFull.size());
-	cout<<massesFull.size()<<" "<<massesFull[0]<<" "<<massesFull[3]<<" "<<minvSqrt[0]<<" "<<minvSqrt[3]<<endl;
+	cout<<"MASS: mtypes:"<<nM<<" "<<massesFull.size()<<" "<<massesFull[0]<<" "<<massesFull[2]<<" "<<minvSqrt[0]<<" "<<minvSqrt[2]<<endl;
 	Vol = Lx* Ly*Lz;
 	if (Vol == 0.0f)
 	{
@@ -286,7 +299,9 @@ float FileManager::readLAMMPSData(string filename, Vector& minvSqrt)
 
 
 	fileInput.close();
+
 	return Vol;
+	processStatus(string("FileManager::readLAMMPSData..finished  mem: ") + mem() );
 }
 
 void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix& hessian)

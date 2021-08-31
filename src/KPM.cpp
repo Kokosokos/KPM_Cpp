@@ -146,7 +146,10 @@ int KPM::getR()
 void KPM::setAF(const Vector& af)
 {
 	//check if scaled??/
+	FileManager fmanager;
 	m_af = m_MinvSqrt.cwiseProduct( af );
+	fmanager.write("m.inv.sqrt.dat", m_MinvSqrt);
+	fmanager.write("af.scaled.dat", m_af);
 }
 
 //Rescaling to ~[-1,1] routines
@@ -405,8 +408,8 @@ Vector KPM::sumSeries(const Vector& freq, const Vector& gP, int chebKind)
 	//Vector 	prefactor		= 4*abs(freq)*abs((2.0-m_nuEdge)/c_PI/(m_emax-m_emin));
 	if(chebKind == 2)
 	{
-//		prefactor  = 4*abs(freq)*abs((2.0-m_nuEdge)/c_PI/(m_emax-m_emin));
-		prefactor  = 4*sqrt(sqr(freq)+pow(c_PI/m_K/2, 2)*m_emax*ones(freq.size())) * abs((2.0-m_nuEdge)/c_PI/(m_emax-m_emin));
+		prefactor  = 4*abs(freq)*abs((2.0-m_nuEdge)/c_PI/(m_emax-m_emin));
+//		prefactor  = 4*sqrt(sqr(freq)+pow(c_PI/m_K/2, 2)*m_emax*ones(freq.size())) * abs((2.0-m_nuEdge)/c_PI/(m_emax-m_emin));
 
 	}
 	else
@@ -428,10 +431,10 @@ Vector KPM::sumSeries(const Vector& freq, const Vector& gP, int chebKind)
 	return sumKPM;
 }
 
-Vector KPM::getModulus(const float& GA, const float& volume, const Vector& gdos_freq, const Vector& gdos, const Vector& freq )
+Vector KPM::getModulus(const float& GA, const float& volume, const Vector& gdos_freq, const Vector& gdos, const Vector& freq, float nu )
 {
-	cout<<"Modulus calculation....\n GA: "<<GA<<"\tVolume: "<<volume<<endl;
-	float nu = 1.0;
+	cout<<"Modulus calculation....\n GA: "<<GA<<"\tVolume: "<<volume<<"\tDOF: "<<m_DOF<<endl;
+
 //	float volume = 571.0;
 //	float N = m_DOF/3.0;
 
@@ -450,10 +453,10 @@ Vector KPM::getModulus(const float& GA, const float& volume, const Vector& gdos_
 	return Gp;
 }
 
-Vector KPM::getModulusImag(const float& GA, const float& volume, const Vector& gdos_freq, const Vector& gdos, const Vector& freq )
+Vector KPM::getModulusImag(const float& GA, const float& volume, const Vector& gdos_freq, const Vector& gdos, const Vector& freq, float nu )
 {
-	cout<<"Modulus calculation....\n GA: "<<GA<<"\tVolume: "<<volume<<endl;
-	float nu = 1.0;
+	cout<<"Modulus calculation....\n GA: "<<GA<<"\tVolume: "<<volume<<"\tDOF: "<<m_DOF<<endl;
+
 //	float volume = 571.0;
 //	float N = m_DOF/3.0;
 

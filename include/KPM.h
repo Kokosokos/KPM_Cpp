@@ -11,7 +11,7 @@
 #include <iostream>
 #include <stdio.h>
 
-//#include "FileManager.h"
+#include "FileManager.h"
 
 using namespace std;
 
@@ -71,8 +71,8 @@ public:
 	Vector getSpreading(Vector freq);
 	Vector sumSeries(const Vector& freq, const Vector& gP, int chebKind = 2);
 
-	Vector getModulus(const float& GA,  const float& volume, const Vector& gdos_freq, const Vector& gdos, const Vector& freq );
-	Vector getModulusImag(const float& GA, const float& volume, const Vector& gdos_freq, const Vector& gdos, const Vector& freq );
+	Vector getModulus(const float& GA,  const float& volume, const Vector& gdos_freq, const Vector& gdos, const Vector& freq, float nu=1.0);
+	Vector getModulusImag(const float& GA, const float& volume, const Vector& gdos_freq, const Vector& gdos, const Vector& freq, float nu=1.0);
 
 	void HTilde();
 

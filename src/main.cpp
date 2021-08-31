@@ -64,6 +64,7 @@ int main(int argc, char* argv[])
 	float emin = 0.0f;
 	float emax = 0.0f;
 	float GA = 97.0; //affine shear modulus
+	float nu = 1.0; //~friction coeff
 	bool find_eminmax = true;
 	string affile;
 
@@ -113,6 +114,7 @@ int main(int argc, char* argv[])
 									  ("gp", value<vector<string>>(&gpFiles)->multitoken(), "gauss projection files (skip calculation and just sum)");
 		gdos.add_options()
 									  ("af", value<string>(), "affine force filename")
+									  ("nu", value<float>(), "friction coeff")
 									  ("GA", value<float>(), "affine shear modulus");
 
 		all.add(necessary).add(optional).add(gdos);
@@ -176,6 +178,8 @@ int main(int argc, char* argv[])
 				{
 					affile = vm["af"].as<string>();
 					GA = vm["GA"].as<float>();
+					if (vm.count("nu"))
+						nu = vm["nu"].as<float>();
 					if(vm.count("mfile"))
 					{
 						mfile = vm["mfile"].as<string>();
@@ -248,7 +252,7 @@ int main(int argc, char* argv[])
 	tstart = clock();
 	sMatrix hessian;
 	processStatus(string("main: Reading matrix....mem: ") + mem());
-	if(!justGp)
+//	if(!justGp)
 		fmanager.readCSR(csrFiles[0], csrFiles[1], csrFiles[2], hessian);
 	processStatus(string("main: Reading matrix... Finished mem: ")+ mem() );
 	KPM kpm( hessian, K, R , epsilon, comm, kernel, lkernel);
@@ -282,8 +286,9 @@ int main(int argc, char* argv[])
 	{
 		Vector minvSqrt;
 		Volume = fmanager.readLAMMPSData(mfile, minvSqrt);
+		processStatus(string("main: readLAMMPSData..finished  mem: ") + mem() );
 		kpm.setMassVectorInvSqrt(minvSqrt);
-
+		processStatus(string("main: setMassVectorInvSqrt..finished  mem: ") + mem() );
 	}
 
 	t = clock() - tstart;
@@ -336,13 +341,12 @@ int main(int argc, char* argv[])
 		if(kpmmode)
 		{
 			Vector neg,pos;
-			//			neg = -1.0*logspace(int(fabs(emin)),-2, log10(sqrt(fabs(emin))));
-			//			pos = logspace(int(emax), -2, log10(sqrt(emax)));
-			//			cout<<"Neg freq\n"<<flush;
-			neg = -1.0*logspace(int(fabs(emin)),0.01, sqrt(fabs(emin)));
-			//			cout<<"Pos freq\n"<<flush;
-			pos = logspace(int(emax), 0.01, sqrt(emax));
-			//			cout<<"Tot freq\n"<<flush;
+
+			//neg = -1.0*logspace(int(fabs(emin)),0.01, sqrt(fabs(emin)));
+			//pos = logspace(int(emax), 0.01, sqrt(emax));
+			neg = -1.0*logspace(int(fabs(emin)),0.001, sqrt(fabs(emin)));
+			pos = logspace(int(emax), 0.001, sqrt(emax));
+
 			freq = Vector(neg.size() + pos.size());
 			freq <<neg.reverse(),pos;
 
@@ -363,10 +367,12 @@ int main(int argc, char* argv[])
 
 		if(kpmmode)
 		{
-			Vector logfreq = logspace(200, 0.01,1000);
-			Vector Gp = kpm.getModulus(GA, Volume, freq, res, logfreq );
+
+			//Vector logfreq = logspace(200, 0.1,1000); //CG
+			Vector logfreq = logspace(400, 1.0,100000); //atom
+			Vector Gp = kpm.getModulus(GA, Volume, freq, res, logfreq, nu);
 			fmanager.write("Gp.dat",logfreq, Gp);
-			Vector Gpp = kpm.getModulusImag(97.0, Volume, freq, res, logfreq );
+			Vector Gpp = kpm.getModulusImag(GA, Volume, freq, res, logfreq, nu );
 			fmanager.write("Gpp.dat",logfreq, Gpp);
 		}
 	}
