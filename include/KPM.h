@@ -103,6 +103,7 @@ public:
 	 * @brief Hessian matrix.
 	 */
 	sMatrix&  m_hessian;
+	sMatrix  m_hessian_rank;
 
 	/**
 	 * @brief Affine force field vector.
@@ -153,6 +154,8 @@ public:
 	float m_nuEdge;
 
 	MPI_Comm m_world;
+	int m_mpi_rank;
+	int m_mpi_size;
 
 };
 

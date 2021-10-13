@@ -33,6 +33,9 @@ KPM::KPM(sMatrix& hessian,  unsigned int K, unsigned int R, float nuEdge, MPI_Co
 {
 	setK(K, kernel, lkernel );
 	m_DOF = m_hessian.cols();
+
+	MPI_Comm_rank(m_world, &m_mpi_rank);
+	MPI_Comm_size(m_world, &m_mpi_size);
 }
 
 
@@ -182,6 +185,8 @@ void KPM::HTilde()
 	m_hessian /= a;
 	processStatus( string("Hessian rescale finished"));
 
+	//m_hessian_rank
+
 }
 
 void KPM::jacksonKernel(int K)
@@ -213,10 +218,6 @@ Vector KPM::getCoeffDOS(int chebKind)
 //	FileManager fmanager;
 	Vector loc_gP = zeros(m_K); // gauss projection
 	Vector glob_gP = zeros(m_K); // gauss projection
-	int rank;
-	int size;
-	MPI_Comm_rank(m_world, &rank);
-	MPI_Comm_size(m_world, &size);
 
 	int out=0;
 
@@ -224,7 +225,7 @@ Vector KPM::getCoeffDOS(int chebKind)
 	{
 		processStatus(string("ERROR: chebKind must be 1 or 2" + chebKind));
 	}
-	for (int r = rank; r < m_R; r+=size)
+	for (int r = m_mpi_rank; r < m_R; r+=m_mpi_size)
 	{
 		if (100 * r / m_R > out )
 		{
@@ -274,25 +275,22 @@ Vector KPM::getCoeffGammaDOS()
 	Vector loc_gP = zeros(m_K); // gauss projection
 	Vector glob_gP = zeros(m_K); // gauss projection
 
-	int rank=0;
-	int size;
-	MPI_Comm_rank(m_world, &rank);
-	MPI_Comm_size(m_world, &size);
-	if(rank==0)
-		cout <<"MPI size:"<< size<<endl;
-	for (int r = rank; r < m_R; r+=size)
+
+	if(m_mpi_rank==0)
+		cout <<"MPI size:"<< m_mpi_size<<endl;
+	for (int r = m_mpi_rank; r < m_R; r+=m_mpi_size)
 	{
-		if (r % 100 < size )
+		if (r % 100 < m_mpi_size )
 		{
 			processRunningStatus(float(r)/m_R);
-//			if(rank == 0)
-//			fmanager.write("gPgamma.c"+to_string(rank)+"_K"+to_string(m_K)+"_R" +to_string(int(r/size)) + ".dat",loc_gP);
+//			if(m_mpi_rank == 0)
+//			fmanager.write("gPgamma.c"+to_string(rank)+"_K"+to_string(m_K)+"_R" +to_string(int(r/m_mpi_size)) + ".dat",loc_gP);
 		}
 
 		Vector v_r = normal(m_DOF);
 		v_r=v_r/v_r.norm();
 //		if(r < 8)
-//			fmanager.write("u"+to_string(r)+"c"+to_string(size)+".dat", v_r);
+//			fmanager.write("u"+to_string(r)+"c"+to_string(m_mpi_size)+".dat", v_r);
 
 		double mLeft = m_af.dot(v_r);
 
@@ -321,7 +319,7 @@ Vector KPM::getCoeffGammaDOS()
 	}
 	processEnded();
 	MPI_Reduce(loc_gP.data(), glob_gP.data(), m_K, MPI_DOUBLE, MPI_SUM, 0, m_world);
-	cout<<"rank: "<<rank<<". loc: "<<loc_gP[0]<<". glob: "<<glob_gP[0]<<endl;
+	cout<<"rank: "<<m_mpi_rank<<". loc: "<<loc_gP[0]<<". glob: "<<glob_gP[0]<<endl;
 	return glob_gP;
 }
 
@@ -356,48 +354,6 @@ Vector KPM::getSpreading(Vector freq)
 	return (c_PI/(2.0*(m_emax - m_emin)*m_K)) * sqrt(pow(m_emax - m_emin,2)*ones(freq.size()) - pow(2-m_nuEdge, 2)*sqr(2.0*freq-ones(freq.size())*(m_emax + m_emin)));
 }
 
-//Vector KPM::sumSeries(const Vector& freq, const Vector& gP, int chebKind)
-//{
-//	Vector sumKPM = zeros(freq.size());
-//	Vector e = sign(freq).cwiseProduct(sqr(freq));
-//	FileManager fmanager;
-//	ETilde(e);
-//	Vector	arccosArgument	= arccos(e);
-//	Vector 	prefactor = ones(freq.size());
-////	Vector K = getKArray(abs(freq[1]-freq[0]));
-//	Vector K = getKArray(freq);
-//
-//	//Vector 	prefactor		= 4*abs(freq)*abs((2.0-m_nuEdge)/c_PI/(m_emax-m_emin));
-//	if(chebKind == 2)
-//	{
-////		prefactor  = 4*abs(freq)*abs((2.0-m_nuEdge)/c_PI/(m_emax-m_emin));
-//		prefactor  = 4*sqrt(sqr(freq)+pow(c_PI/m_K/2, 2)*m_emax*ones(freq.size())) * abs((2.0-m_nuEdge)/c_PI/(m_emax-m_emin));
-//
-//	}
-//	else
-//	{
-//		prefactor  =  2*abs(freq)*abs((2.0-m_nuEdge)/c_PI/(m_emax-m_emin));
-//		prefactor = prefactor.cwiseProduct( (sqrt(ones(e.size()) - sqr(e))).cwiseInverse() );
-//	}
-//	int cof = 1;
-//	std::cout<<"R======"<<m_R<<std::endl;
-//
-//	for(int i=0;i< freq.size();++i)
-//	{
-//		K[i] = K[i]<m_K?int(K[i]):m_K;
-//		for ( int k = 0; k < K[i]; ++k)
-//		{
-//			if(chebKind == 2)
-//				sumKPM[i]			+= prefactor[i]*( m_jk[k]*gP[k]/m_R)  * sin((k + 1.0) * arccosArgument[i]);
-//			else
-////				sumKPM[i]			+= cof*prefactor[i]( m_jk[k]*gP[k]/m_R)  * cos((k) * arccosArgument[i]);
-//
-//			cof = 2;
-//		}
-//	}
-//	fmanager.write("K.array.dat", K);
-//	return sumKPM;
-//}
 Vector KPM::sumSeries(const Vector& freq, const Vector& gP, int chebKind)
 {
 	Vector sumKPM = zeros(freq.size());
@@ -435,9 +391,6 @@ Vector KPM::getModulus(const float& GA, const float& volume, const Vector& gdos_
 {
 	cout<<"Modulus calculation....\n GA: "<<GA<<"\tVolume: "<<volume<<"\tDOF: "<<m_DOF<<endl;
 
-//	float volume = 571.0;
-//	float N = m_DOF/3.0;
-
 	Vector Gp = zeros(gdos_freq.size());
 	Vector e = sign(gdos_freq).cwiseProduct(sqr(gdos_freq));
 	int vsize = e.size();
@@ -474,25 +427,4 @@ Vector KPM::getModulusImag(const float& GA, const float& volume, const Vector& g
 	return Gpp;
 }
 
-//Vector gp_gpp(n_bins_0, bin_min, bin_max, GA, GammaDos, nu, Volume, N):
-//    n_bins = int(n_bins_0);
-//    bin_width = (bin_max - bin_min) / n_bins
-//    # print bin_min
-//
-//    Gp = np.zeros(shape=(n_bins, 2))
-//    Gpp = np.zeros(shape=(n_bins, 2))
-//
-//    E = np.sign(GammaDos[0]) * (GammaDos[0]) ** 2
-//    # E = (GammaDos[0]) ** 2
-//    for i in range(n_bins):
-//        freq = 10.0 ** (bin_min + i * bin_width)
-//        Ediff = (E - freq ** 2)
-//        denom = (Ediff ** 2 + (nu * freq) ** 2) * Volume / 3.0 / N
-//
-//        Gp[i][1] = GA - np.trapz(GammaDos[1] * Ediff / denom, GammaDos[0])
-//        Gpp[i][1] = np.trapz(GammaDos[1] * freq * nu / denom, GammaDos[0])
-//        Gp[i][0] = freq
-//        Gpp[i][0] = freq
-//
-//    return Gp, Gpp
 

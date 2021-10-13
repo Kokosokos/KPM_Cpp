@@ -30,7 +30,7 @@ public:
 	 * @param[out] hessian Sparse matrix (hessian)
 	 */
 
-	void readCSR(string fdata, string findices, string findptr, sMatrix& hessian);
+	void readCSR(string fdata, string findices, string findptr, sMatrix& hessian, MPI_Comm inworld=MPI_COMM_WORLD);
 	void write(string filename, const Vector& v1, const Vector& v2);
 	void write(string filename, const Vector& v1);
 
