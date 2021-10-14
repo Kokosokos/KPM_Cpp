@@ -146,10 +146,10 @@ int KPM::getR()
 void KPM::setAF(const Vector& af)
 {
 	//check if scaled??/
-	FileManager fmanager;
+//	FileManager fmanager;
 	m_af = m_MinvSqrt.cwiseProduct( af );
-	fmanager.write("m.inv.sqrt.dat", m_MinvSqrt);
-	fmanager.write("af.scaled.dat", m_af);
+//	fmanager.write("m.inv.sqrt.dat", m_MinvSqrt);
+//	fmanager.write("af.scaled.dat", m_af);
 }
 
 //Rescaling to ~[-1,1] routines
