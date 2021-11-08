@@ -65,7 +65,9 @@ public:
 
 
 	Vector getCoeffDOS(int chebKind = 2); // 1 or 2
+	//If not privided use simple MPI_gather!!!
 	Vector getCoeffGammaDOS();
+	Vector getCoeffGammaDOS(vector<int> sizes, vector<int> displacements);
 	Vector getKArray(float dfreq);
 	Vector getKArray(const Vector& freq);
 	Vector getSpreading(Vector freq);
@@ -103,7 +105,7 @@ public:
 	 * @brief Hessian matrix.
 	 */
 	sMatrix&  m_hessian;
-	sMatrix  m_hessian_rank;
+//	sMatrix  m_hessian_rank;
 
 	/**
 	 * @brief Affine force field vector.

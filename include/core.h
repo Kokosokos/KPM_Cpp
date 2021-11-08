@@ -6,6 +6,7 @@
  */
 #define EIGEN
 #define EIGEN_DEFAULT_DENSE_INDEX_TYPE long int
+#define EIGEN_DONT_PARALLELIZE //slows down with mpi parallel
 #ifndef __CORE_H_
 #define __CORE_H_
 
@@ -22,6 +23,7 @@ typedef long int indexType;
 typedef Eigen::SparseMatrix<double, c_myStorageOrder> sMatrix2;
 typedef Eigen::SparseMatrix<double, c_myStorageOrder, indexType> sMatrix;
 typedef Eigen::VectorXd Vector;
+
 
 
 //Numpy-like functions

@@ -304,7 +304,7 @@ float FileManager::readLAMMPSData(string filename, Vector& minvSqrt)
 	processStatus(string("FileManager::readLAMMPSData..finished  mem: ") + mem() );
 }
 
-void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix& hessian, MPI_Comm inworld)
+void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix& hessian, vector<int>& sizes, vector<int>& displacements, MPI_Comm inworld)
 {
 	int m_mpi_rank,m_mpi_size;
 	MPI_Comm_rank(inworld, &m_mpi_rank);
@@ -336,8 +336,8 @@ void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 	int nrows_per_rank = m_mpi_rank==(m_mpi_size-1)?N/m_mpi_size+N%m_mpi_size:N/m_mpi_size;
 	int cols_per_rank = N;
 	int shift = N/m_mpi_size*m_mpi_rank; //dont need it
-
-
+	MPI_Allgather( &nrows_per_rank, 1, MPI_INT, sizes.data(),         1, MPI_INT, inworld);
+	MPI_Allgather( &shift,          1, MPI_INT, displacements.data(), 1, MPI_INT,  inworld);
 	//+1 ensures that next inptr starts with last value of previous
 	vector<long int>  indptr_per_rank(indptr.begin() + shift, indptr.begin() + shift + nrows_per_rank + 1);
 	long int indptr_shift = indptr_per_rank[0];

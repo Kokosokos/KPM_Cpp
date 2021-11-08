@@ -243,9 +243,11 @@ int main(int argc, char* argv[])
 	//------------------------------------------------------------------------------------
 	processStatus("KPM started");
 
-	int rank;
+	int rank, size;
 	MPI_Comm comm=MPI_COMM_WORLD;
-	MPI_Comm_rank(comm, &rank);
+//	MPI_Comm_rank(comm, &rank);
+	rank = MPI::COMM_WORLD.Get_rank();
+	size = MPI::COMM_WORLD.Get_size();
 	//	Eigen::setNbThreads(4);
 	clock_t t;
 	clock_t tstart;
@@ -253,7 +255,12 @@ int main(int argc, char* argv[])
 	sMatrix hessian;
 	processStatus(string("main: Reading matrix....mem: ") + mem());
 //	if(!justGp)
-		fmanager.readCSR(csrFiles[0], csrFiles[1], csrFiles[2], hessian);
+//		fmanager.readCSR(csrFiles[0], csrFiles[1], csrFiles[2], hessian);
+	vector<int> sizes(size);
+	vector<int> displacements(size);
+	fmanager.readCSR("H.data.dat", "H.indices.dat", "H.indptr.dat", hessian, sizes, displacements, comm);
+
+
 	processStatus(string("main: Reading matrix... Finished mem: ")+ mem() );
 	KPM kpm( hessian, K, R , epsilon, comm, kernel, lkernel);
 	//	if(!justGp)
