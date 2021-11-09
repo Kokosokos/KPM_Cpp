@@ -27,3 +27,5 @@ core
 /ReleaseMPILib/
 
 /lammps-dev/src/lmp_*
+/Default/
+/ReleaseLib/

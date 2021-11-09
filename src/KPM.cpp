@@ -59,19 +59,19 @@ bool KPM::findEmin()
 {
 	Eigen::VectorXcd evalues;
 	SparseGenMatProd<double,  c_myStorageOrder, indexType> op(m_hessian);
-	GenEigsSolver< double, SMALLEST_REAL, SparseGenMatProd<double, c_myStorageOrder, indexType> > eigs(&op, 3, 20);
+	GenEigsSolver< SparseGenMatProd<double, c_myStorageOrder, indexType> > eigs(op, 3, 20);
 	// Initialize and compute
 	eigs.init();
-	eigs.compute(5000, 0.001, SMALLEST_REAL);
+	eigs.compute(SortRule::SmallestReal, 5000, 0.001);
 	// Retrieve results
-	if(eigs.info() == SUCCESSFUL)
+	if(eigs.info() == CompInfo::Successful)
 		evalues = eigs.eigenvalues();
 	else
 	{
 		std::cout << "\nWARNING: Can't calculate Emin: ";
-		if( eigs.info() == NOT_CONVERGING)
+		if( eigs.info() == CompInfo::NotConverging)
 			std::cout<<"NOT_CONVERGING\n";
-		if( eigs.info() == NUMERICAL_ISSUE)
+		if( eigs.info() == CompInfo::NumericalIssue)
 			std::cout<<"NUMERICAL_ISSUE\n";
 		return false;
 	}
@@ -86,12 +86,12 @@ bool KPM::findEmax()
 	SparseGenMatProd<double,  c_myStorageOrder,indexType> op(m_hessian);
 
 	// Construct eigen solver object, requesting the largest three eigenvalues
-	GenEigsSolver< double, LARGEST_MAGN, SparseGenMatProd<double, c_myStorageOrder, indexType> > eigs(&op, 3, 7);
+	GenEigsSolver< SparseGenMatProd<double, c_myStorageOrder, indexType> > eigs(op, 3, 7);
 	// Initialize and compute
 	eigs.init();
-	eigs.compute();
+	eigs.compute(SortRule::LargestMagn);
 	// Retrieve results
-	if(eigs.info() == SUCCESSFUL)
+	if(eigs.info() == CompInfo::Successful)
 		evalues = eigs.eigenvalues();
 	else
 	{
