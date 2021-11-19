@@ -4,9 +4,12 @@
  *  Created on: 6 Nov 2018
  *      Author: ikriuchevs
  */
+//#define DETERMINISTIC //sets const seed to rnd generators
 #define EIGEN
 #define EIGEN_DEFAULT_DENSE_INDEX_TYPE long int
 #define EIGEN_DONT_PARALLELIZE //slows down with mpi parallel
+//#define EIGEN_SPARSEMATRIX_PLUGIN "BlockMethods.h"
+//#define EIGEN_SPARSEMATRIXBASE_PLUGIN "BlockMethods.h"
 #ifndef __CORE_H_
 #define __CORE_H_
 
@@ -122,10 +125,16 @@ template <typename T> int sgn(T val) {
 #include <algorithm>
 
 #include "mpi.h"
+//std::random_device{}() - seed to std::mt19937_64
 auto normalrnd = [](float mean, float sigma)
 {
+#ifdef DETERMINISTIC
+	auto randomFunc = [distribution_ = std::normal_distribution<>(mean, sigma),
+	                       random_engine_ = std::mt19937_64{ 1 }]() mutable
+#else
     auto randomFunc = [distribution_ = std::normal_distribution<>(mean, sigma),
                        random_engine_ = std::mt19937_64{ std::random_device{}() }]() mutable
+#endif
     {
         return distribution_(random_engine_);
     };
@@ -134,8 +143,13 @@ auto normalrnd = [](float mean, float sigma)
 
 auto uniformrnd = [](float min,  float max)
 {
-    auto randomFunc = [distribution_ = std::uniform_real_distribution<>(min, max),
-                       random_engine_ = std::mt19937_64{ std::random_device{}() }]() mutable
+#ifdef DETERMINISTIC
+	auto randomFunc = [distribution_ = std::uniform_real_distribution<>(min, max),
+					   random_engine_ = std::mt19937_64{ 1 }]() mutable
+#else
+	auto randomFunc = [distribution_ = std::uniform_real_distribution<>(min, max),
+						random_engine_ = std::mt19937_64{ std::random_device{}() }]() mutable
+#endif
     {
         return distribution_(random_engine_);
     };

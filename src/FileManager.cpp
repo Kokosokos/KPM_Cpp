@@ -41,39 +41,6 @@ string mem()
 {
 	return to_string(memInt());
 }
-//std::string mem()
-//{
-//
-//    const std::string info[] = {"Cached:", "Buffers:", "MemFree:", "MemTotal:"};
-//    int intInfo[4];
-//
-//    std::string token;
-//    std::ifstream file("/proc/meminfo");
-//
-//    while(file >> token){
-//
-//        for(short i = 4; i != -1; --i)
-//        {
-//            if(token == info[i])
-//            {
-//                file >> intInfo[i];
-//
-//                if(i == 0){
-//                    file.close();
-//                    return std::to_string((intInfo[3] - intInfo[2] - (intInfo[1] + intInfo[0])) / 1024) + "m ";
-//                }
-//
-//            }
-//        }
-//
-//       // ignore rest of the line
-//        file.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-//    }
-//
-//
-//    // Couldn't get a reading!
-//    return "...";
-//}
 
 FileManager::FileManager() {
 	// TODO Auto-generated constructor stub
@@ -304,6 +271,98 @@ float FileManager::readLAMMPSData(string filename, Vector& minvSqrt)
 	processStatus(string("FileManager::readLAMMPSData..finished  mem: ") + mem() );
 }
 
+void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix& hessian)
+{
+	//Read indptr from CSR matrix (== cumulative number of nonzero elements in a row)
+	processStatus(string("Reading indptr.. mem: ") +  mem());
+
+	vector<long int> indptr;
+	FILE *stream;
+	stream = fopen(findptr.c_str(), "r");
+	if (stream==NULL) perror ("Error opening file for indptr");
+
+	long int val;
+	while(fscanf(stream, "%ld", &val) != EOF)
+	{
+		indptr.push_back(val);
+	}
+	fclose(stream);
+	unsigned int N=indptr.size()-1;
+
+	int DOF = N;
+
+	//Read data and column indices
+	long int nNon0 = *(indptr.end()-1); //number of non zero elements
+
+	FILE *stream3;
+	stream3 = fopen(fdata.c_str(), "r");
+	FILE *stream2;
+	stream2 = fopen(findices.c_str(), "r");
+
+
+	double dataval=0.0;
+	int indval=0;
+	int rowLen = 0;
+
+	//Create sparse matrix
+	processStatus("Creating sparse matrix...");
+	hessian = sMatrix(N,N);
+	// Reserving enough space for non-zero elements
+
+	processStatus("Reserving sparse matrix space..." );
+
+	//allocate space for all nonzero element + additional N,
+	//in case any diag element is zero
+	hessian.reserve( nNon0 + N);
+
+	processStatus(string("Reserving sparse matrix space...finished    mem: ") + mem());
+
+	long int nel=0;
+	int percent = 2;
+	processStatus("Reading Hessian from csr....");
+	for (unsigned int i =0; i < N ;++i)
+	{
+		rowLen = indptr[i+1] - indptr[i];
+
+		hessian.startVec(i);
+		bool diag_zero = true;
+
+		if(rowLen == 0)
+			hessian.insertBack( i, i ) =  0.00f ;
+		for (int j =0;j <rowLen;++j)
+		{
+
+			fscanf(stream3, "%lf", &dataval);
+			fscanf(stream2, "%ld", &indval);
+
+			if(i == indval-1)
+				diag_zero = false;
+			if(indval-1>i && diag_zero)
+			{
+				hessian.insertBack( i, i ) =  0.00f ;
+				nel++;
+				diag_zero = false;
+			}
+			hessian.insertBack( i, indval-1) =  dataval ;
+			nel++;
+		}
+		double p = double(nel)/nNon0;
+
+		processRunningStatus(p);
+
+	}
+	processEnded();
+	hessian.finalize();
+	processStatus(string("Outer index size: ") + to_string(sizeof(*hessian.outerIndexPtr())) );
+	processStatus(string("Inner index size: ")+ to_string(sizeof(*hessian.innerIndexPtr())) );
+	processStatus(string("Reading csr matrix finished... mem: ") + mem());
+	fclose(stream2);
+	fclose(stream3);
+	//	m_hessian.makeCompressed();
+	//get 1 element
+
+}
+
 void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix& hessian, vector<int>& sizes, vector<int>& displacements, MPI_Comm inworld)
 {
 	int m_mpi_rank,m_mpi_size;
@@ -344,12 +403,6 @@ void FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 //	for(long int& e: indptr_per_rank) e-=e0;
 	for(long int& e: indptr_per_rank) e-=indptr_shift;
 	Vector v_indptr;// = zeros(indptr.size());
-
-	//print
-//	vector<double>  indptr_per_rank_d(indptr_per_rank.begin(),indptr_per_rank.end());
-//	v_indptr =Vector::Map(indptr_per_rank_d.data(),indptr_per_rank_d.size());
-//	write("indptr."+to_string(m_mpi_rank)+".dat", v_indptr);
-
 
 	//Read data and column indices
 	//------------------------------------------------------------------------------------------------------
