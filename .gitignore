@@ -28,12 +28,6 @@ core
 
 /lammps-dev/src/lmp_*
 /ReleaseLib/
-/Default/*
-!/Default/makefile
-!/Default/*mk
-/EminEmax/*
-!/EminEmax/makefile
-!/EminEmax/*.mk
-/tests/*
-!/tests/makefile
-!/tests/*.mk
+!/Default/*
+!/EminEmax/*
+!/tests/*
