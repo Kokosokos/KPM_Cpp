@@ -27,7 +27,10 @@ core
 /ReleaseMPILib/
 
 /lammps-dev/src/lmp_*
-/Default/
 /ReleaseLib/
-/EminEmax/
-/tests/
+/Default/*
+!/Default/makefile
+/EminEmax/*
+!/EminEmax/makefile
+/tests/*
+!/tests/makefile
