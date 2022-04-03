@@ -92,28 +92,19 @@ int main(int argc, char* argv[])
 
 	int rank, size;
 	MPI_Comm comm=MPI_COMM_WORLD;
-//	MPI_Comm_rank(comm, &rank);
 	rank = MPI::COMM_WORLD.Get_rank();
 	size = MPI::COMM_WORLD.Get_size();
-	//	Eigen::setNbThreads(4);
+
 	clock_t t;
 	clock_t tstart;
 	tstart = clock();
-	sMatrix hessian;
-	processStatus(string("main: Reading matrix....mem: ") + mem());
+	sMatrixPointer hessian;
 
 	vector<int> sizes(size);
 	vector<int> displacements(size);
-	fmanager.readCSR(csrFiles[0], csrFiles[1], csrFiles[2], hessian, sizes, displacements, comm);
 
-
-	processStatus(string("main: Reading matrix... Finished mem: ")+ mem() );
-	KPM kpm( hessian, kpmParams, sizes, displacements, comm);
-
-
-	kpm.HTilde();
-
-	processStatus(string("main: HTilde..end  mem: ") + mem() );
+	hessian = std::move(fmanager.readCSR(csrFiles[0], csrFiles[1], csrFiles[2], std::move(hessian), sizes, displacements, comm));
+	KPM kpm( std::move(hessian), kpmParams, sizes, displacements, comm);
 
 	if(mconst)
 		kpm.constMass(m);
@@ -121,19 +112,12 @@ int main(int argc, char* argv[])
 	{
 		Vector minvSqrt;
 		kpmGParams.setVolume( fmanager.readLAMMPSData(mfile, minvSqrt));
-		processStatus(string("main: readLAMMPSData..finished  mem: ") + mem() );
 		kpm.setMassVectorInvSqrt(minvSqrt);
-		processStatus(string("main: setMassVectorInvSqrt..finished  mem: ") + mem() );
 	}
-
-	t = clock() - tstart;
-	processStatus(string("It took me ")+ to_string(((float)t)/CLOCKS_PER_SEC) +"seconds.");
-	processStatus(string("main: HTilde..start  mem: ") + mem() );
-
 
 	//Gauss projection vectors calculation/read
 	//------------------------------------------------------------------------------------
-	Vector gp  = zeros(kpm.getK());
+	Vector gp  = zeros(kpmParams.getK());
 
 	if(kpmCalc == KPMCalculation::Sum)
 	{
@@ -204,7 +188,6 @@ int parseInput(int argc, char* argv[], KPMMode& kpmmode, KPMParams& params, KPMG
 	float epsilon = 0.05;
 	float emin = 0.0f;
 	float emax = 0.0f;
-	params.setFindEminEmax(true);
 	kpmCalc = KPMCalculation::Full;
 	string kernel = "jk";
 	int lkernel=4;

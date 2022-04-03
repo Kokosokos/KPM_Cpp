@@ -5,6 +5,7 @@
  *      Author: ikriuchevs
  */
 //#define DETERMINISTIC //sets const seed to rnd generators
+#define VERBOSE
 #define EIGEN
 #define EIGEN_DEFAULT_DENSE_INDEX_TYPE long int
 #define EIGEN_DONT_PARALLELIZE //slows down with mpi parallel
@@ -15,7 +16,7 @@
 
 //#define WITHOPENCV
 #include <iostream>
-
+#include <memory>
 const double c_PI=3.14159;
 
 #include <Eigen/Sparse>
@@ -24,8 +25,12 @@ const   Eigen::StorageOptions c_myStorageOrder =  Eigen::RowMajor;
 typedef long int indexType;
 //typedef int indexType;
 typedef Eigen::SparseMatrix<double, c_myStorageOrder> sMatrix2;
-typedef Eigen::SparseMatrix<double, c_myStorageOrder, indexType> sMatrix;
-typedef Eigen::VectorXd Vector;
+//typedef Eigen::SparseMatrix<double, c_myStorageOrder, indexType> sMatrix;
+using sMatrix = Eigen::SparseMatrix<double, c_myStorageOrder, indexType>;
+using sMatrixPointer = std::unique_ptr<sMatrix>;
+
+using Vector = Eigen::VectorXd;
+using VectorPointer = std::unique_ptr<Vector>;
 
 
 
@@ -176,10 +181,12 @@ inline Vector normal( unsigned int nn)
 
 inline void processRunningStatus(float progress)
 {
-	int rank;
-	int size;
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	MPI_Comm_size(MPI_COMM_WORLD, &size);
+#ifdef VERBOSE
+	int rank = 0;
+	int flag;
+	MPI_Initialized(&flag);
+	if(flag)
+		MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	if(rank == 0)
 	{
 		int barWidth = 70;
@@ -194,34 +201,42 @@ inline void processRunningStatus(float progress)
 		std::cout << "] " << int(progress * 100.0) << " %\r";
 		std::cout.flush();
 	}
+#endif
 }
 
 
 inline void processStatus( std::string message)
 {
-	int rank;
-	int size;
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	MPI_Comm_size(MPI_COMM_WORLD, &size);
+#ifdef VERBOSE
+	int rank = 0;
+	int flag;
+	MPI_Initialized(&flag);
+	if(flag)
+		MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
 	if(rank == 0)
 	{
 		std::cout << message<< std::endl;
 		std::cout.flush();
 	}
+#endif
 }
 
 inline void processEnded()
 {
-	int rank;
-	int size;
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	MPI_Comm_size(MPI_COMM_WORLD, &size);
+#ifdef VERBOSE
+	int rank = 0;
+	int flag;
+	MPI_Initialized(&flag);
+	if(flag)
+			MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
 	if(rank==0)
 	 {
 		std::cout<<std::endl;
 		std::cout.flush();
 	 }
-
+#endif
 }
 
 inline std::vector<unsigned int>	trueIndexes( const std::vector<bool> &vector )

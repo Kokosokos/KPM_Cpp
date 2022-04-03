@@ -6,73 +6,33 @@
 // Description : Hello World in C++, Ansi-style
 //============================================================================
 
-
-#include "KPM.h"
-#include "FileManager.h"
 #include <iostream>
 #include <fstream>
 
-
-//!!!! Implement ZERO FREQ SHEAR MODULUS output!!!
-//!
-//!!!! Separate Kernel into interface + jackson, lorentzz....implementations.
-//!
 using namespace std;
-
-
-#include <Eigen/Core>
-#include <Eigen/SparseCore>
-
 
 //Parse input arguments
 #include <boost/program_options.hpp>
 using namespace boost::program_options;
 
-#include <random>
-#include <map>
-#include <cmath>
-#include <iomanip>
-//
+#include "EminEmaxFinder.h"
 
 int parseInput(int argc, char* argv[], vector<string>& csrFiles);
+//vector<double> findEminEmax(const vector<string>& csrFiles);
 
 int main(int argc, char* argv[])
 {
-	MPI_Init(&argc, &argv);
-	FileManager fmanager;
-	vector<string> csrFiles;
 
+	vector<string> csrFiles;
 	parseInput(argc, argv, csrFiles);
 
-
-	//KPM START
-	//------------------------------------------------------------------------------------
-	processStatus("Find EMin/EMax started");
-
-	//	Eigen::setNbThreads(4);
-	clock_t t;
-	clock_t tstart;
-	tstart = clock();
-	sMatrix hessian;
-	processStatus(string("main: Reading matrix....mem: ") + mem());
-//	if(!justGp)
-
-	fmanager.readCSR(csrFiles[0], csrFiles[1], csrFiles[2], hessian);
-
-
-	processStatus(string("main: Reading matrix... Finished mem: ")+ mem() );
-	FindEminEmax fE;
-
-	float emin = fE.findEmin(hessian);
-	float emax = fE.findEmax(hessian);
-
-	cout<<"Emin/Emax: "<<emin << " / "<<emax<<endl;
+	EminEmaxFinder finder;
+	vector<double> e_limits = finder.findEminEmax(csrFiles);
 
 	FILE *stream;
 	stream = fopen("emin_emax.dat", "w");
-	fprintf(stream, "%f %f\n",emin, emax );
-	MPI_Finalize();
-	return 1;
+	fprintf(stream, "%f %f\n", e_limits[0], e_limits[1] );
+	fclose(stream);
 }
 
 int parseInput(int argc, char* argv[], vector<string>& csrFiles)

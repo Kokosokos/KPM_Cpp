@@ -1,0 +1,9 @@
+#Small test of KPM build on CG model
+1) Calculate Emin/Emax:
+	../../EminEmax/KPM_Cpp --csr INPUT/H.*
+2) run KPM analysis for DOS (K and R - parameters of KPM, 1000/40 - should be enough for DOS calculation):
+    cores=8 #this will speed up calcualtion
+	emin=$(awk '{print $1}' emin_emax.dat)
+	emax=$(awk '{print $2}' emin_emax.dat)
+    mpirun -np $cores ../../Default/KPM_Cpp --csr INPUT/H.data.dat INPUT/H.indices.dat INPUT/H.indptr.dat --mode dos --K 1000 --R 40 --emin $emin --emax $emax
+
