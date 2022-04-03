@@ -30,7 +30,10 @@ core
 /ReleaseLib/
 /Default/*
 !/Default/makefile
+!/Default/*mk
 /EminEmax/*
 !/EminEmax/makefile
+!/EminEmax/*.mk
 /tests/*
 !/tests/makefile
+!/tests/*.mk
