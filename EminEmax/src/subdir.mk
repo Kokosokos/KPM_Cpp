@@ -7,6 +7,7 @@ CPP_SRCS += \
 ../src/EminEmaxFinder.cpp \
 ../src/FileManager.cpp \
 ../src/KPM.cpp \
+../src/KPMParameters.cpp \
 ../src/eminemax.cpp 
 
 O_SRCS += \
@@ -19,12 +20,14 @@ OBJS += \
 ./src/EminEmaxFinder.o \
 ./src/FileManager.o \
 ./src/KPM.o \
+./src/KPMParameters.o \
 ./src/eminemax.o 
 
 CPP_DEPS += \
 ./src/EminEmaxFinder.d \
 ./src/FileManager.d \
 ./src/KPM.d \
+./src/KPMParameters.d \
 ./src/eminemax.d 
 
 

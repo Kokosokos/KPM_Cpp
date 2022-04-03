@@ -31,3 +31,5 @@ core
 !/Default/*
 !/EminEmax/*
 !/tests/*
+/Default/
+/EminEmax/

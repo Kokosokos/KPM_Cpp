@@ -418,6 +418,7 @@ src/KPM.o: ../src/KPM.cpp \
  /usr/include/x86_64-linux-gnu/mpich/mpi.h \
  /usr/include/x86_64-linux-gnu/mpich/mpicxx.h \
  /mnt/data/home/codes/eclipse-workdir/KPM_Cpp/include/FileManager.h \
+ /mnt/data/home/codes/eclipse-workdir/KPM_Cpp/include/KPMParameters.h \
  /mnt/data/home/codes/libs/eigen-3.4.0/Eigen/Core \
  /mnt/data/home/codes/libs/eigen-3.4.0/Eigen/SparseCore
 
@@ -1258,6 +1259,8 @@ src/KPM.o: ../src/KPM.cpp \
 /usr/include/x86_64-linux-gnu/mpich/mpicxx.h:
 
 /mnt/data/home/codes/eclipse-workdir/KPM_Cpp/include/FileManager.h:
+
+/mnt/data/home/codes/eclipse-workdir/KPM_Cpp/include/KPMParameters.h:
 
 /mnt/data/home/codes/libs/eigen-3.4.0/Eigen/Core:
 
