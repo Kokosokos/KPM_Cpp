@@ -31,6 +31,7 @@ core
 !*.mk
 /EminEmax/EminEmax
 /Default/KPM_Cpp
+/*/ReleaseMPILib
 /lammps-dev/src/lmp_*
 /ReleaseLib/
 !/*/makefile
