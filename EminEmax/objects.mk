@@ -6,3 +6,5 @@ USER_OBJS :=
 
 LIBS := -lmpich -lboost_program_options
 
+boostlibdir := ../../usr/lib
+

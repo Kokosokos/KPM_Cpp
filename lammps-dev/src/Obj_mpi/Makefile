@@ -45,7 +45,8 @@ MPI_LIB =
 
 #KPM
 KPM_INC  = 		 
-KPM_PATH =       -L/home/ivan/eclipse-workspace/KPM/ReleaseMPILib/ -I/mnt/data1/home/PostDoc2/spectra/include/ -I/mnt/data1/home/PostDoc2/eigen/ -I/home/ivan/eclipse-workspace/KPM/include/
+home_path = /home/users/ivan.kriuchevskyi
+KPM_PATH =       -L${home_path}/KPM_Cpp/ReleaseMPILib/ -I${home_path}/spectra/include/ -I${home_path}/eigen/ -I${home_path}/KPM_Cpp/include/ -I${home_path}/usr/include/boost
 KPM_LIB  =       -lKPM
 # FFT library
 # see discussion in Section 3.5.2 of manual

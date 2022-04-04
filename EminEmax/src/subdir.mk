@@ -30,12 +30,12 @@ CPP_DEPS += \
 ./src/KPMParameters.d \
 ./src/eminemax.d 
 
-
 # Each subdirectory must supply rules for building sources it contributes
+include src/includes.mk
 src/%.o: ../src/%.cpp src/subdir.mk
 	@echo 'Building file: $<'
 	@echo 'Invoking: GCC C++ Compiler'
-	mpic++ -I/mnt/data/home/codes/eclipse-workdir/KPM_Cpp/include -I/mnt/data/home/codes/libs/spectra/include -I/usr/include/x86_64-linux-gnu/mpich/ -I/usr/include -I/mnt/data/home/codes/libs/include -I/mnt/data/home/codes/libs/eigen-3.4.0 -O3 -g -Wall -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$@" -o "$@" "$<"
+	mpic++ -I../include -I$(spectradir) -I$(mpichdir) -I/usr/include -I$(boostinclude) -I$(eigendir) -O3 -g -Wall -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$@" -o "$@" "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
 

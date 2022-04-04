@@ -1,7 +1,6 @@
 ################################################################################
 # Automatically-generated file. Do not edit!
 ################################################################################
-
 -include ../makefile.init
 
 RM := rm
@@ -9,7 +8,7 @@ RM := rm
 # All of the sources participating in the build are defined here
 -include sources.mk
 -include src/subdir.mk
--include ReleaseMPILib/subdir.mk
+#-include ReleaseMPILib/subdir.mk
 -include subdir.mk
 -include objects.mk
 
@@ -59,7 +58,7 @@ main-build: KPM_Cpp
 KPM_Cpp: $(OBJS) $(USER_OBJS) makefile objects.mk $(OPTIONAL_TOOL_DEPS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C++ Linker'
-	mpic++ -L/mnt/data/home/codes/libs/lib -o "KPM_Cpp" $(OBJS) $(USER_OBJS) $(LIBS)
+	mpic++ -L$(boostlibdir) -o "KPM_Cpp" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
