@@ -1,6 +1,8 @@
 *.o
+*.d
 *.so
 *.a
+*.log
 
 core
 /hdf5-1.12.0/**
@@ -26,13 +28,10 @@ core
 /test_500/
 /ReleaseMPILib/
 
+!*.mk
+/EminEmax/EminEmax
+/Default/KPM_Cpp
 /lammps-dev/src/lmp_*
 /ReleaseLib/
-/EminEmax/
 !/*/makefile
-!/*/*.mk
-!/*/*/*.mk
-/EminEmax/*/*d
-/EminEmax/*/*o
 !/tests/*
-/Default/
