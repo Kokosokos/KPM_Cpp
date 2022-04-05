@@ -52,8 +52,8 @@ int main(int argc, char* argv[])
 	KPMParams kpmParams;
 	KPMCalculation kpmCalc;
 	//Shear modulus output params
-	KPMGParams kpmGParams(0.0, 1.0, 1.0, 1.0, 100000, 400); 	//atom
-//	KPMGParams kpmGParams(0.0, 1.0, 1.0, 0.1, 1000, 200);		//CG model
+//	KPMGParams kpmGParams(0.0, 1.0, 1.0, 1.0, 100000, 400); 	//atom
+	KPMGParams kpmGParams(0.0, 1.0, 1.0, 0.1, 1000, 200);		//CG model
 
 	//GDOS-only parameters
 	string affile;
