@@ -32,7 +32,7 @@ public:
 
 	sMatrixPointer readCSR(string fdata, string findices, string findptr,
 						   sMatrixPointer hessian, vector<int>& sizes, vector<int>& displacements, MPI_Comm inworld);
-	bool readCSR(string fdata, string findices, string findptr, sMatrix& hessian);
+	sMatrixPointer readCSR(string fdata, string findices, string findptr);
 	void write(string filename, const Vector& v1, const Vector& v2);
 	void write(string filename, const Vector& v1);
 

@@ -28,35 +28,21 @@ enum class KPMKernels
 
 struct KPMGParams
 {
-private:
-	float GA; //affine shear modulus
-	float Volume;
-	float nu; //~friction coeff
-	float wmin;     //atom, CG: 0.1
-	float wmax;  //atom, CG: 1000
-	unsigned int nw;//atom, CG: 200
 public:
+	float GA; 		//affine shear modulus
+	unsigned int DOF; // Total degrees of freedom/matrix size
+	float Volume;
+	float nu; 		//~friction coeff
+	float wmin;     //atom, CG: 0.1
+	float wmax;  	//atom, CG: 1000
+	unsigned int nw;//atom, CG: 200
 	KPMGParams();
 	KPMGParams(float GAT, float V, float nuT,float wminT, float wmaxT, unsigned int nPoints ):
 				GA(GAT), Volume(V), nu(nuT), wmin(wminT), wmax(wmaxT), nw(nPoints){};
-	void setGA(float GAT)      {GA = GAT;};
-	void setVolume(float volT)      {Volume = volT;};
-	void setFriction(float nuT){nu = nuT;};
-	void setFreqRange(float wminT, float wmaxT, unsigned int nPoints)
-	{
-		wmin = wminT;
-		wmax = wmaxT;
-		nw = nPoints;
-	};
-	float getGA() const { return GA;};
-	float getVolume() const {return Volume;};
-	float getFriction() const { return nu;};
-	float getWmin() const { return wmin;};
-	float getWmax() const { return wmax;};
-	unsigned int getNPoints() const {return nw;};
 
 	using Pointer = std::unique_ptr<KPMGParams>;
 };
+
 struct KPMParams
 {
 public:
@@ -80,8 +66,14 @@ public:
 	 * @brief Jackson kernel
 	 */
 	Vector		m_jk;
+	Vector MinvSqrt;
+	Vector af;
 public:
 	KPMParams():epsilon(0.05),kernel(KPMKernels::Jackson),lkernel(0),emin(0.0f),emax(0.0f){};
+	void setAF(const Vector& af);
+	void setMassVectorInvSqrt(const Vector& mInvSqrt);
+	void setMassVectorInvSqrt(float m, unsigned int DOF);
+
 	void setK(unsigned int K);
 	void setR(unsigned int RR){R = RR;};
 	void setEpsilon(float epsilonT){epsilon = epsilonT;};

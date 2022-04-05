@@ -7,6 +7,25 @@
 
 #include "KPMParameters.h"
 
+void KPMParams::setMassVectorInvSqrt(float m, unsigned int DOF)
+{
+	MinvSqrt = 1.0 / sqrt(m) * ones(DOF);
+//	m_MinvSqrt = Vector::Map(massesFull.data(), massesFull.size());
+}
+//-------------------------------------------------------------------------------
+
+void KPMParams::setMassVectorInvSqrt( const Vector& mInvSqrt)
+{
+	MinvSqrt = mInvSqrt;
+
+}
+//-------------------------------------------------------------------------------
+
+void KPMParams::setAF(const Vector& iaf)
+{
+	af = MinvSqrt.cwiseProduct( iaf );
+}
+
 void KPMParams::setK(unsigned int KK)
 {
 	K = KK;

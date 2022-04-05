@@ -10,36 +10,21 @@
 using namespace std;
 
 class KPM {
+
 public:
 	KPM(sMatrixPointer hessian, const KPMParams& params,  const vector<int>&sizes, const vector<int>&displacements, MPI_Comm inworld=MPI_COMM_WORLD);
 	~KPM() = default;
 
-	void setMassVectorInvSqrt( const Vector& mInvSqrt);
-	void constMass(float m);
-	void setEminEmax( const float& emin, const float& emax);
-	void setAF(const Vector& af);
-
-	Vector getCoeffDOS(int chebKind = 2); // 1 or 2
-	Vector getCoeffGammaDOS();
-	Vector getCoeffGammaDOS(vector<int> sizes, vector<int> displacements);
+	virtual Vector getCoefficients(int chebKind = 2) = 0; // 1 or 2
 	Vector sumSeries(const Vector& freq, const Vector& gP, int chebKind = 2);
 
-	//Different Class!!
-	Vector getModulus(const float& GA,  const float& volume, const Vector& gdos_freq, const Vector& gdos, const Vector& freq, float nu=1.0);
-	Vector getModulusImag(const float& GA, const float& volume, const Vector& gdos_freq, const Vector& gdos, const Vector& freq, float nu=1.0);
+	using Pointer = std::unique_ptr<KPM>;
 
-
-	private:
+protected:
 	void HTilde();
 	double aScaling();
 	double bScaling();
 	void ETilde(Vector& e);
-
-	public:
-	/**
-	 * @brief Total number of non zero elements in the matrix
-	 */
-	unsigned int m_nnonzero;
 
 	/**
 	 * @brief Total degrees of freedom/matrix size
@@ -49,22 +34,6 @@ public:
 	 * @brief Hessian matrix.
 	 */
 	sMatrixPointer  m_hessian;
-
-	/**
-	 * @brief Affine force field vector.
-	 */
-	Vector m_af;
-
-	/**
-	 * @brief Vector of particle masses (x dim)
-	 */
-	Vector m_M;
-
-	/**
-	 * @brief Vector of particle masses (inverse squared)
-	 */
-	Vector m_MinvSqrt;
-
 	/**
 	 * @brief Parameters of the KPM
 	 */
@@ -77,5 +46,33 @@ public:
 	int m_mpi_size;
 
 };
+class KPMDOS: public KPM
+{
+public:
+	using KPM::KPM;
+	virtual Vector getCoefficients(int chebKind = 2) override;
+	using Pointer = std::unique_ptr<KPMDOS>;
+};
+
+class KPMGammaDOS: public KPM
+{
+public:
+	using KPM::KPM;
+	virtual Vector getCoefficients(int chebKind = 2) override;
+	using Pointer = std::unique_ptr<KPMGammaDOS>;
+private:
+};
+
+
+
+class ShearModulus
+{
+public:
+	ShearModulus() = default;
+	~ShearModulus() = default;
+	Vector getStorage(KPMGParams params,  const Vector& gdos_freq, const Vector& gdos, const Vector& freq);
+	Vector getLoss(KPMGParams params, const Vector& gdos_freq, const Vector& gdos, const Vector& freq);
+};
+
 
 #endif /* KPM_H_ */

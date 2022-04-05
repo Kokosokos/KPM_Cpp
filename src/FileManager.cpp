@@ -271,7 +271,7 @@ float FileManager::readLAMMPSData(string filename, Vector& minvSqrt)
 	processStatus(string("FileManager::readLAMMPSData..finished  mem: ") + mem() );
 }
 
-bool FileManager::readCSR(string fdata, string findices, string findptr, sMatrix& hessian)
+sMatrixPointer FileManager::readCSR(string fdata, string findices, string findptr)
 {
 	processStatus(string("Reading indptr.. mem: ") +  mem());
 
@@ -280,7 +280,7 @@ bool FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 	if (stream == NULL)
 	{
 		std::cerr<<("Error opening CSR.inptr file: "+findptr +"\n");
-		return false;
+		return nullptr;
 	}
 	FILE *stream3;
 	stream3 = fopen(fdata.c_str(), "r");
@@ -288,7 +288,7 @@ bool FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 	{
 		fclose(stream);
 		std::cerr<<("Error opening CSR.data file\n");
-		return false;
+		return nullptr;
 	}
 	FILE *stream2;
 	stream2 = fopen(findices.c_str(), "r");
@@ -298,7 +298,7 @@ bool FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 		fclose(stream);
 		fclose(stream3);
 		std::cerr<<("Error opening CSR.indices file\n");
-		return false;
+		return nullptr;
 	}
 
 	vector<long int> indptr;
@@ -310,57 +310,49 @@ bool FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 	fclose(stream);
 	unsigned int N=indptr.size()-1;
 
-	int DOF = N;
 
 	//Read data and column indices
 	long int nNon0 = *(indptr.end()-1); //number of non zero elements
 
-
-
 	double dataval=0.0;
-	int indval=0;
+	long int indval=0;
 	int rowLen = 0;
 
 	//Create sparse matrix
 	processStatus("Creating sparse matrix...");
-	hessian = sMatrix(N,N);
-	// Reserving enough space for non-zero elements
-
-	processStatus("Reserving sparse matrix space..." );
-
-	//allocate space for all nonzero element + additional N,
-	//in case any diag element is zero
-	hessian.reserve( nNon0 + N);
-
-	processStatus(string("Reserving sparse matrix space...finished    mem: ") + mem());
+	auto hessian = sMatrixPointer(new sMatrix(N,N));
+	hessian->reserve( nNon0 + N);
 
 	long int nel=0;
-	int percent = 2;
 	processStatus("Reading Hessian from csr....");
 	for (unsigned int i =0; i < N ;++i)
 	{
 		rowLen = indptr[i+1] - indptr[i];
 
-		hessian.startVec(i);
+		hessian->startVec(i);
 		bool diag_zero = true;
 
 		if(rowLen == 0)
-			hessian.insertBack( i, i ) =  0.00f ;
+			hessian->insertBack( i, i ) =  0.00f ;
 		for (int j =0;j <rowLen;++j)
 		{
 
-			fscanf(stream3, "%lf", &dataval);
-			fscanf(stream2, "%ld", &indval);
+			if (fscanf(stream3, "%lf", &dataval) != 1 || fscanf(stream2, "%ld", &indval) != 1)
+			{
+				fclose(stream2);
+				fclose(stream3);
+				return nullptr;
+			}
 
 			if(i == indval-1)
 				diag_zero = false;
 			if(indval-1>i && diag_zero)
 			{
-				hessian.insertBack( i, i ) =  0.00f ;
+				hessian->insertBack( i, i ) =  0.00f ;
 				nel++;
 				diag_zero = false;
 			}
-			hessian.insertBack( i, indval-1) =  dataval ;
+			hessian->insertBack( i, indval-1) =  dataval ;
 			nel++;
 		}
 		double p = double(nel)/nNon0;
@@ -369,15 +361,12 @@ bool FileManager::readCSR(string fdata, string findices, string findptr, sMatrix
 
 	}
 	processEnded();
-	hessian.finalize();
-	processStatus(string("Outer index size: ") + to_string(sizeof(*hessian.outerIndexPtr())) );
-	processStatus(string("Inner index size: ")+ to_string(sizeof(*hessian.innerIndexPtr())) );
+	hessian->finalize();
 	processStatus(string("Reading csr matrix finished... mem: ") + mem());
 	fclose(stream2);
 	fclose(stream3);
-	//	m_hessian.makeCompressed();
-	//get 1 element
-	return true;
+
+	return hessian;
 
 }
 
@@ -401,7 +390,6 @@ sMatrixPointer FileManager::readCSR(string fdata, string findices, string findpt
 	if (stream==NULL) perror ("Error opening file for indptr");
 
 	long int val;
-	int k=0;
 	while(fscanf(stream, "%ld", &val) != EOF)
 	{
 		indptr.push_back(val);
@@ -409,17 +397,13 @@ sMatrixPointer FileManager::readCSR(string fdata, string findices, string findpt
 	fclose(stream);
 	unsigned int N=indptr.size()-1;
 
-	int DOF = N;
-
-	int nrows_per_rank = m_mpi_rank==(m_mpi_size-1)?N/m_mpi_size+N%m_mpi_size:N/m_mpi_size;
-	int cols_per_rank = N;
+	unsigned int nrows_per_rank = m_mpi_rank==(m_mpi_size-1)?N/m_mpi_size+N%m_mpi_size:N/m_mpi_size;
 	int shift = N/m_mpi_size*m_mpi_rank; //dont need it
 	MPI_Allgather( &nrows_per_rank, 1, MPI_INT, sizes.data(),         1, MPI_INT, inworld);
 	MPI_Allgather( &shift,          1, MPI_INT, displacements.data(), 1, MPI_INT,  inworld);
 	//+1 ensures that next inptr starts with last value of previous
 	vector<long int>  indptr_per_rank(indptr.begin() + shift, indptr.begin() + shift + nrows_per_rank + 1);
 	long int indptr_shift = indptr_per_rank[0];
-//	for(long int& e: indptr_per_rank) e-=e0;
 	for(long int& e: indptr_per_rank) e-=indptr_shift;
 	Vector v_indptr;// = zeros(indptr.size());
 
@@ -435,34 +419,29 @@ sMatrixPointer FileManager::readCSR(string fdata, string findices, string findpt
 
 
 	double dataval=0.0;
-	int indval=0;
+	long int indval=0;
 	int rowLen = 0;
 
-
-
-	//------------------------------------------------------------------------------------------------------
 	//Create sparse matrix
 	processStatus("Creating sparse matrix...");
 	hessian = sMatrixPointer(new sMatrix(nrows_per_rank,N));
-	// Reserving enough space for non-zero elements
-
-	processStatus("Reserving sparse matrix space..." );
 
 	//allocate space for all nonzero element + additional N,
 	//in case any diag element is zero
 	hessian->reserve( nNon0 + nrows_per_rank);
 
-	processStatus(string("Reserving sparse matrix space...finished    mem: ") + mem());
-
 	long int nel=0;
-	int percent = 2;
 	processStatus("Reading Hessian from csr....");
 	//Skip to correct block of data/indices
 	//------------------------------------------------------------------------------------------------------
 	for(int k = 0; k < indptr_shift; ++k)
 	{
-		fscanf(stream3, "%lf", &dataval);
-		fscanf(stream2, "%ld", &indval);
+		if (fscanf(stream3, "%lf", &dataval) != 1 || fscanf(stream2, "%ld", &indval) != 1)
+		{
+			fclose(stream2);
+			fclose(stream3);
+			return nullptr;
+		}
 	}
 	//------------------------------------------------------------------------------------------------------
 
@@ -477,10 +456,12 @@ sMatrixPointer FileManager::readCSR(string fdata, string findices, string findpt
 			hessian->insertBack( i, i ) =  0.00f ;
 		for (int j =0;j <rowLen;++j)
 		{
-
-			fscanf(stream3, "%lf", &dataval);
-			fscanf(stream2, "%ld", &indval);
-
+			if (fscanf(stream3, "%lf", &dataval) != 1 || fscanf(stream2, "%ld", &indval) != 1)
+			{
+				fclose(stream2);
+				fclose(stream3);
+				return nullptr;
+			}
 			if(i == indval-1)
 				diag_zero = false;
 			if(indval-1>i && diag_zero)
@@ -503,8 +484,6 @@ sMatrixPointer FileManager::readCSR(string fdata, string findices, string findpt
 	hessian->finalize();
 	processStatus(string("Reading csr matrix finished... mem: ") + mem());
 
-	//	m_hessian.makeCompressed();
-	//get 1 element
 	return hessian;
 }
 

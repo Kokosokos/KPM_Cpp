@@ -24,15 +24,23 @@ int main(int argc, char* argv[])
 {
 
 	vector<string> csrFiles;
-	parseInput(argc, argv, csrFiles);
+	if (!parseInput(argc, argv, csrFiles))
+	{
+		return 1;
+	}
 
 	EminEmaxFinder finder;
 	vector<double> e_limits = finder.findEminEmax(csrFiles);
+	if (e_limits[1] < e_limits[0])
+	{
+		return 1;
+	}
 
 	FILE *stream;
 	stream = fopen("emin_emax.dat", "w");
 	fprintf(stream, "%f %f\n", e_limits[0], e_limits[1] );
 	fclose(stream);
+	return 0;
 }
 
 int parseInput(int argc, char* argv[], vector<string>& csrFiles)
@@ -61,7 +69,6 @@ int parseInput(int argc, char* argv[], vector<string>& csrFiles)
 				std::cout << all << '\n';
 				return 0;
 			}
-
 
 			if( csrFiles.size() == 3 )
 			{

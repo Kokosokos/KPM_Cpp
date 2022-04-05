@@ -27,28 +27,7 @@ KPM::KPM(sMatrixPointer hessian, const KPMParams& params, const vector<int>&size
 	MPI_Comm_size(m_world, &m_mpi_size);
 	HTilde();
 }
-
-
-void KPM::constMass(float m)
-{
-	m_MinvSqrt = 1.0 / sqrt(m) * ones(m_DOF);
-//	m_MinvSqrt = Vector::Map(massesFull.data(), massesFull.size());
-}
-void KPM::setMassVectorInvSqrt( const Vector& mInvSqrt)
-{
-	m_MinvSqrt = mInvSqrt;
-
-}
-
-void KPM::setEminEmax( const float& emin, const float& emax)
-{
-	m_params.setEminEmax(emin, emax);
-}
-
-void KPM::setAF(const Vector& af)
-{
-	m_af = m_MinvSqrt.cwiseProduct( af );
-}
+//-------------------------------------------------------------------------------
 
 //Rescaling to ~[-1,1] routines
 double KPM::aScaling()
@@ -56,10 +35,14 @@ double KPM::aScaling()
 	return (m_params.getEmax()-m_params.getEmin())/(2.0-m_params.getEpsilon());
 
 }
+//-------------------------------------------------------------------------------
+
 double KPM::bScaling()
 {
 	return (m_params.getEmax()+m_params.getEmin())/(2.0);
 }
+//-------------------------------------------------------------------------------
+
 void KPM::ETilde(Vector& e)
 {
 	if(e.maxCoeff() > m_params.getEmax() || e.minCoeff() < m_params.getEmin())
@@ -70,6 +53,8 @@ void KPM::ETilde(Vector& e)
 	e = (e-b*ones(e.size()))/a;
 
 }
+//-------------------------------------------------------------------------------
+
 void KPM::HTilde()
 {
 	double  a = aScaling();
@@ -87,11 +72,44 @@ void KPM::HTilde()
 	//m_hessian_rank
 
 }
-Vector KPM::getCoeffDOS(int chebKind)
+//-------------------------------------------------------------------------------
+
+Vector KPM::sumSeries(const Vector& freq, const Vector& gP, int chebKind)
+{
+	Vector sumKPM = zeros(freq.size());
+	Vector e = sign(freq).cwiseProduct(sqr(freq));
+	ETilde(e);
+	Vector	arccosArgument	= arccos(e);
+	Vector 	prefactor = ones(freq.size());
+	if(chebKind == 2)
+	{
+		prefactor  = 4*abs(freq)*abs((2.0-m_params.getEpsilon())/c_PI/(m_params.getEmax()-m_params.getEmin()));
+	}
+	else
+	{
+		prefactor  =  2*abs(freq)*abs((2.0-m_params.getEpsilon())/c_PI/(m_params.getEmax()-m_params.getEmin()));
+		prefactor = prefactor.cwiseProduct( (sqrt(ones(e.size()) - sqr(e))).cwiseInverse() );
+	}
+	int cof = 1;
+
+	for ( unsigned int k =0; k < m_params.getK(); ++k)
+	{
+		if(chebKind == 2)
+			sumKPM			+= prefactor.cwiseProduct(( m_params.m_jk[k]*gP[k]/m_params.getR())  * sin((k + 1.0) * arccosArgument));
+		else
+			sumKPM			+= cof*prefactor.cwiseProduct(( m_params.m_jk[k]*gP[k]/m_params.getR())  * cos((k) * arccosArgument));
+
+		cof = 2;
+	}
+	return sumKPM;
+}
+//========================================================================================================
+
+Vector KPMDOS::getCoefficients(int chebKind)
 {
 	Vector loc_gP  = zeros(m_params.getK()); // gauss projection
 
-	int out=0;
+	unsigned int out=0;
 
 	if (!(chebKind == 1 || chebKind == 2))
 	{
@@ -149,8 +167,11 @@ Vector KPM::getCoeffDOS(int chebKind)
 	processEnded();
 	return loc_gP;
 }
+//========================================================================================================
 
-Vector KPM::getCoeffGammaDOS()
+//-------------------------------------------------------------------------------
+
+Vector KPMGammaDOS::getCoefficients(int chebKind)
 {
 
 	Vector loc_gP  = zeros(m_params.getK()); // gauss projection
@@ -176,7 +197,7 @@ Vector KPM::getCoeffGammaDOS()
 		}
 		MPI_Bcast(v_r.data(), m_DOF, MPI_DOUBLE, 0, m_world);
 
-		double mLeft = m_af.dot(v_r);
+		double mLeft = m_params.af.dot(v_r);
 
 		Vector polyChebCurrRank = v_r;
 		Vector polyChebCurr = v_r;
@@ -191,7 +212,7 @@ Vector KPM::getCoeffGammaDOS()
 		polyChebPrevPrev = polyChebPrev;
 		polyChebPrev = polyChebCurr;
 
-		loc_gP[1] += mLeft * m_af.dot( polyChebCurr);
+		loc_gP[1] += mLeft * m_params.af.dot( polyChebCurr);
 
 		for (unsigned int k = 2; k < m_params.getK(); ++k)
 		{
@@ -201,7 +222,7 @@ Vector KPM::getCoeffGammaDOS()
 			polyChebPrevPrev = polyChebPrev;
 			polyChebPrev = polyChebCurr;
 
-			loc_gP[k] += mLeft * m_af.dot( polyChebCurr);
+			loc_gP[k] += mLeft * m_params.af.dot( polyChebCurr);
 		}
 	}
 	processRunningStatus(1.0f);
@@ -211,41 +232,8 @@ Vector KPM::getCoeffGammaDOS()
 }
 
 
-
-Vector KPM::sumSeries(const Vector& freq, const Vector& gP, int chebKind)
+Vector ShearModulus::getStorage(KPMGParams params,  const Vector& gdos_freq, const Vector& gdos, const Vector& freq)
 {
-	Vector sumKPM = zeros(freq.size());
-	Vector e = sign(freq).cwiseProduct(sqr(freq));
-	ETilde(e);
-	Vector	arccosArgument	= arccos(e);
-	Vector 	prefactor = ones(freq.size());
-	if(chebKind == 2)
-	{
-		prefactor  = 4*abs(freq)*abs((2.0-m_params.getEpsilon())/c_PI/(m_params.getEmax()-m_params.getEmin()));
-	}
-	else
-	{
-		prefactor  =  2*abs(freq)*abs((2.0-m_params.getEpsilon())/c_PI/(m_params.getEmax()-m_params.getEmin()));
-		prefactor = prefactor.cwiseProduct( (sqrt(ones(e.size()) - sqr(e))).cwiseInverse() );
-	}
-	int cof = 1;
-
-	for ( unsigned int k =0; k < m_params.getK(); ++k)
-	{
-		if(chebKind == 2)
-			sumKPM			+= prefactor.cwiseProduct(( m_params.m_jk[k]*gP[k]/m_params.getR())  * sin((k + 1.0) * arccosArgument));
-		else
-			sumKPM			+= cof*prefactor.cwiseProduct(( m_params.m_jk[k]*gP[k]/m_params.getR())  * cos((k) * arccosArgument));
-
-		cof = 2;
-	}
-	return sumKPM;
-}
-
-Vector KPM::getModulus(const float& GA, const float& volume, const Vector& gdos_freq, const Vector& gdos, const Vector& freq, float nu )
-{
-	cout<<"Modulus calculation....\n GA: "<<GA<<"\tVolume: "<<volume<<"\tDOF: "<<m_DOF<<endl;
-
 	Vector Gp = zeros(gdos_freq.size());
 	Vector e = sign(gdos_freq).cwiseProduct(sqr(gdos_freq));
 	int vsize = e.size();
@@ -253,20 +241,16 @@ Vector KPM::getModulus(const float& GA, const float& volume, const Vector& gdos_
 	{
 			Vector ediff = e - ones(vsize) * freq[i] * freq[i];
 
-			Vector denom = ((sqr(ediff) + ones(vsize)*(nu * freq[i])*(nu * freq[i])) * volume / m_DOF).cwiseInverse();
+			Vector denom = ((sqr(ediff) + ones(vsize)*(params.nu * freq[i])*(params.nu * freq[i])) * params.Volume / params.DOF).cwiseInverse();
 ;
-			Gp[i] = GA - trapz(gdos.cwiseProduct(ediff).cwiseProduct(denom), gdos_freq);
+			Gp[i] = params.GA - trapz(gdos.cwiseProduct(ediff).cwiseProduct(denom), gdos_freq);
  	}
 
 	return Gp;
 }
 
-Vector KPM::getModulusImag(const float& GA, const float& volume, const Vector& gdos_freq, const Vector& gdos, const Vector& freq, float nu )
+Vector ShearModulus::getLoss(KPMGParams params,  const Vector& gdos_freq, const Vector& gdos, const Vector& freq)
 {
-	cout<<"Modulus calculation....\n GA: "<<GA<<"\tVolume: "<<volume<<"\tDOF: "<<m_DOF<<endl;
-
-//	float volume = 571.0;
-//	float N = m_DOF/3.0;
 
 	Vector Gpp = zeros(gdos_freq.size());
 	Vector e = sign(gdos_freq).cwiseProduct(sqr(gdos_freq));
@@ -275,8 +259,8 @@ Vector KPM::getModulusImag(const float& GA, const float& volume, const Vector& g
 	for( int i = 0; i < freq.size();++i)
 	{
 			Vector ediff = e - ones(vsize) * freq[i] * freq[i];
-			Vector denom = ((sqr(ediff) + ones(vsize)*(nu * freq[i])*(nu * freq[i])) * volume / m_DOF).cwiseInverse();
-			Gpp[i] = trapz((gdos * freq[i] * nu).cwiseProduct(denom), gdos_freq);
+			Vector denom = ((sqr(ediff) + ones(vsize)*(params.nu * freq[i])*(params.nu * freq[i])) * params.Volume / params.DOF).cwiseInverse();
+			Gpp[i] = trapz((gdos * freq[i] * params.nu).cwiseProduct(denom), gdos_freq);
  	}
 
 	return Gpp;

@@ -52,8 +52,8 @@ int main(int argc, char* argv[])
 	KPMParams kpmParams;
 	KPMCalculation kpmCalc;
 	//Shear modulus output params
-	KPMGParams kpmGParams(0.0, 1.0, 1.0, 1.0, 100000, 400); //atom
-//	KPMGParams kpmGParams(0.0, 1.0, 1.0, 0.1, 1000, 200); //CG model
+	KPMGParams kpmGParams(0.0, 1.0, 1.0, 1.0, 100000, 400); 	//atom
+//	KPMGParams kpmGParams(0.0, 1.0, 1.0, 0.1, 1000, 200);		//CG model
 
 	//GDOS-only parameters
 	string affile;
@@ -73,7 +73,7 @@ int main(int argc, char* argv[])
 	//KPM DOS/GDOS output frequencies
 	Vector freq = arange(4000, sgn(kpmParams.getEmin())*sqrt(fabs(kpmParams.getEmin())), sqrt(kpmParams.getEmax()));
 	//G', G'' frequencies
-	Vector logfreq = logspace(kpmGParams.getNPoints(), kpmGParams.getWmin(),kpmGParams.getWmax()); //atom
+	Vector logfreq = logspace(kpmGParams.nw, kpmGParams.wmin,kpmGParams.wmax);
 	if(kpmMode == KPMMode::GDOS)
 	{
 		Vector neg,pos;
@@ -84,7 +84,6 @@ int main(int argc, char* argv[])
 		freq <<neg.reverse(),pos;
 
 	}
-
 
 	//KPM START
 	//------------------------------------------------------------------------------------
@@ -103,56 +102,63 @@ int main(int argc, char* argv[])
 	vector<int> sizes(size);
 	vector<int> displacements(size);
 
+	//if not kpmCalc == KPMCalculation::Sum
 	hessian = std::move(fmanager.readCSR(csrFiles[0], csrFiles[1], csrFiles[2], std::move(hessian), sizes, displacements, comm));
-	KPM kpm( std::move(hessian), kpmParams, sizes, displacements, comm);
-
-	if(mconst)
-		kpm.constMass(m);
-	else
+	if (!hessian)
 	{
-		Vector minvSqrt;
-		kpmGParams.setVolume( fmanager.readLAMMPSData(mfile, minvSqrt));
-		kpm.setMassVectorInvSqrt(minvSqrt);
+		processStatus("Error while reading CSR");
+		return 1;
 	}
+	kpmGParams.DOF = hessian->cols(); //to do: Avoid getting it from Hessian, to be able to just sum
+
+	Vector gp  = zeros(kpmParams.getK());
+	if(kpmMode == KPMMode::GDOS)
+	{
+		if(mconst)
+			kpmParams.setMassVectorInvSqrt(m, kpmGParams.DOF);
+		else
+		{
+			Vector minvSqrt;
+			kpmGParams.Volume = fmanager.readLAMMPSData(mfile, minvSqrt);
+			kpmParams.setMassVectorInvSqrt(minvSqrt);
+		}
+		Vector af;
+		fmanager.readAF(affile, af);
+		kpmParams.setAF(af);
+		processStatus("calculating coeffs...");
+	}
+//	KPM::Pointer kpm = nullptr;
+	auto kpm = kpmMode == KPMMode::GDOS ? KPM::Pointer( new KPMGammaDOS(std::move(hessian), kpmParams, sizes, displacements, comm)):
+			KPM::Pointer( new KPMDOS(std::move(hessian), kpmParams, sizes, displacements, comm));
 
 	//Gauss projection vectors calculation/read
 	//------------------------------------------------------------------------------------
-	Vector gp  = zeros(kpmParams.getK());
-
 	if(kpmCalc == KPMCalculation::Sum)
 	{
+
 		processStatus("reading coeff files...");
 		for (unsigned int i =0; i< gpFiles.size(); ++i)
 		{
-			cout<<" "<<gpFiles[i]<<flush;
+			processStatus(gpFiles[i]);
 			Vector locgp = zeros(kpmParams.getK());
 			fmanager.read(gpFiles[i], locgp);
 
 			gp += locgp(Eigen::seq(0,kpmParams.getK()-1));
 		}
-		cout<<"\n";
 	}
 	else
 	{
 		processStatus("calculating coeffs...");
-		if(kpmMode == KPMMode::GDOS)
-		{
-			Vector af;
-			fmanager.readAF(affile, af);
-			kpm.setAF(af);
-		}
-		gp = kpmMode == KPMMode::GDOS?kpm.getCoeffGammaDOS():kpm.getCoeffDOS();
+		gp = kpm->getCoefficients();
 	}
 
-//	MPI_Barrier(comm);
-//	return 1;
 	if(rank == 0)
 	{
 		if(kpmCalc == KPMCalculation::Full)
 			fmanager.write(gpFile,gp);
 
 		processStatus("Sum series started...");
-		Vector res = kpm.sumSeries(freq, gp);
+		Vector res = kpm->sumSeries(freq, gp);
 
 		fmanager.write(resFile,freq, res);
 		fmanager.write("freq.dat",freq);
@@ -167,13 +173,13 @@ int main(int argc, char* argv[])
 		fclose(stream);
 		if(kpmMode == KPMMode::GDOS)
 		{
-			Vector Gp = kpm.getModulus(kpmGParams.getGA(), kpmGParams.getVolume(), freq, res, logfreq, kpmGParams.getFriction());
+			ShearModulus smodulus;
+			Vector Gp = smodulus.getStorage(kpmGParams, freq, res, logfreq);
 			fmanager.write("Gp.dat",logfreq, Gp);
-			Vector Gpp = kpm.getModulusImag(kpmGParams.getGA(), kpmGParams.getVolume(), freq, res, logfreq, kpmGParams.getFriction() );
+			Vector Gpp = smodulus.getLoss(kpmGParams, freq, res, logfreq);
 			fmanager.write("Gpp.dat",logfreq, Gpp);
 		}
 	}
-
 
 	MPI_Finalize();
 	return 0;
@@ -204,12 +210,12 @@ int parseInput(int argc, char* argv[], KPMMode& kpmmode, KPMParams& params, KPMG
 			necessary.add_options()
 		    							  ("help,h", "Help screen")
 										  ("csr", value<vector<string>>(&csrFiles)->multitoken()->required(), "Input CSR fromatted matrix. data, indices and indptr filenames.")
-										  ("mode", value<string>()->required(), "set mode: dos or gdos");
+										  ("mode", value<string>()->required(), "set mode: dos or gdos")
+										  ("emin", value<float>(&emin), "Set the minimum eigenvalue")
+										  ("emax", value<float>(&emax), "Set the maximum eigenvalue");
 			optional.add_options()
 										  ("K", value<int>(&K)->default_value(1000), "Set the maximum polynomial  order")
 										  ("R", value<int>(&R)->default_value(20), "Set the number of random vectors")
-										  ("emin", value<float>(&emin), "Set the minimum eigenvalue (if not set we'll calculate it for you)")
-										  ("emax", value<float>(&emax), "Set the maximum eigenvalue")
 										  ("mfile", value<string>(), "lammps data file to read masses")
 										  ("e", value<float>(&epsilon)->default_value(0.05), "Set the epsilon value")
 										  ("kernel", value<string>()->default_value("jk"), "Choose kernel")
@@ -283,9 +289,9 @@ int parseInput(int argc, char* argv[], KPMMode& kpmmode, KPMParams& params, KPMG
 					if (vm.count("af") && vm.count("GA") && ( vm.count("mfile") || vm.count("m")))
 					{
 						affile = vm["af"].as<string>();
-						kpmGParams.setGA(vm["GA"].as<float>());
+						kpmGParams.GA = vm["GA"].as<float>();
 						if (vm.count("nu"))
-							kpmGParams.setFriction(vm["nu"].as<float>());
+							kpmGParams.nu = vm["nu"].as<float>();
 						if(vm.count("mfile"))
 						{
 							mfile = vm["mfile"].as<string>();

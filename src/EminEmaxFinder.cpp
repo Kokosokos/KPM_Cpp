@@ -10,18 +10,16 @@ using namespace Spectra;
 
 vector<double> EminEmaxFinder::findEminEmax( const vector<string>& csrFiles)
 {
-	//	Eigen::setNbThreads(4);
-	clock_t t;
-	clock_t tstart;
-	tstart = clock();
-	sMatrix hessian;
-
 	FileManager fmanager;
-	if (!fmanager.readCSR(csrFiles[0], csrFiles[1], csrFiles[2], hessian))
+	auto hessian = std::move(fmanager.readCSR(csrFiles[0], csrFiles[1], csrFiles[2]));
+	if (!hessian)
+	{
+		processStatus("ERROR!!! while reading Hessian");
 		return {10,-10}; //error indicator, coz emin must be <= emax
+	}
 
-	float emin = findEmin(hessian);
-	float emax = findEmax(hessian);
+	float emin = findEmin(*hessian);
+	float emax = findEmax(*hessian);
 
 	return {emin, emax};
 };
