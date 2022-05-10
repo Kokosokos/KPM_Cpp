@@ -92,10 +92,16 @@ void FileManager::read(string filename, Vector& v1)
 void  FileManager::readAF(string filename, Vector& af)
 {
 	read(filename, af);
+}
+
+VectorPointer  FileManager::readAF(string filename)
+{
+	VectorPointer res = VectorPointer(new Vector);
+	read(filename, *res);
+	return res;
 	//	af = m_af.cwiseProduct(m_MinvSqrt);
 	//	m_af = my_vect;
 }
-
 
 float FileManager::readLAMMPSData(string filename, Vector& minvSqrt)
 {
@@ -252,23 +258,17 @@ float FileManager::readLAMMPSData(string filename, Vector& minvSqrt)
 			break;
 		}
 	}
-
-	//	m_M = Vector::Map(massesFull.data(), massesFull.size());
 	minvSqrt = Vector::Map(massesFull.data(), massesFull.size());
-	cout<<"MASS: mtypes:"<<nM<<" "<<massesFull.size()<<" "<<massesFull[0]<<" "<<massesFull[2]<<" "<<minvSqrt[0]<<" "<<minvSqrt[2]<<endl;
+	processStatus("MASS: mtypes:" + std::to_string(nM) + " " + std::to_string(N));
 	Vol = Lx* Ly*Lz;
 	if (Vol == 0.0f)
 	{
 		std::cout<<"Warning: Can't read box size from lammps data file (or it is zero, or it is 2d simulation)"<<std::endl;
 	}
-
-	//Search for masses values
-
-
 	fileInput.close();
 
-	return Vol;
 	processStatus(string("FileManager::readLAMMPSData..finished  mem: ") + mem() );
+	return Vol/N;
 }
 
 sMatrixPointer FileManager::readCSR(string fdata, string findices, string findptr)
@@ -444,7 +444,7 @@ sMatrixPointer FileManager::readCSR(string fdata, string findices, string findpt
 		}
 	}
 	//------------------------------------------------------------------------------------------------------
-
+	unsigned int out=0;
 	for (unsigned int i =0; i < nrows_per_rank ;++i)
 	{
 		rowLen = indptr_per_rank[i+1] - indptr_per_rank[i];
@@ -474,8 +474,11 @@ sMatrixPointer FileManager::readCSR(string fdata, string findices, string findpt
 			nel++;
 		}
 		double p = double(nel)/nNon0;
-
-		processRunningStatus(p);
+		if (100 * p > out )
+		{
+			processRunningStatus(p);
+			out+=10;
+		}
 
 	}
 	processEnded();
@@ -486,5 +489,80 @@ sMatrixPointer FileManager::readCSR(string fdata, string findices, string findpt
 
 	return hessian;
 }
+KPMGParams FileManager::readKPMGParameters(string filename)
+{
+	std::unordered_map<std::string, std::vector<std::string>> params = readParameters(filename);
+	if( params.empty() )
+	{
+		processStatus("WARNING: readKPMGParameters: Please provide parameters file, using default atom values");
+		return KPMGParams();
+//		exit(EXIT_FAILURE);
+	}
+//	GA{GAT}, nu{nuT}, wmin{wminT}, wmax{wmaxT}, nw{nPoints}, c_wcut,nFreq
+	KPMGParams kpmGParams;
+	if (params.count("GA"))
+	{
+		kpmGParams.GA = std::stof(params.at("GA")[0]);
+	}
+	if (params.count("nu"))
+	{
+		kpmGParams.nu = std::stof(params.at("nu")[0]);
+	}
+	if (params.count("wmin"))
+	{
+		kpmGParams.wmin = std::stof(params.at("wmin")[0]);
+	}
 
+	if (params.count("wmax"))
+	{
+		kpmGParams.wmax = std::stof(params.at("wmax")[0]);
+	}
 
+	if (params.count("wcount"))
+	{
+		kpmGParams.wcount = std::stoi(params.at("wcount")[0]);
+	}
+
+	if (params.count("wcut"))
+	{
+		kpmGParams.wcut = std::stof(params.at("wcut")[0]);
+	}
+
+	if (params.count("nFreq"))
+	{
+		kpmGParams.nFreq = std::stoi(params.at("nFreq")[0]);
+	}
+
+	return kpmGParams;
+}
+
+std::unordered_map<std::string, std::vector<std::string>> FileManager::readParameters(string filename)
+{
+	ifstream ifs{filename};
+	if (!ifs)
+	{
+		processStatus("ERROR: cannot open file");
+		return std::unordered_map<std::string, std::vector<std::string>>{};
+	}
+	std::string line;
+	std::unordered_map<std::string, std::vector<std::string>> properties;
+
+	while(std::getline(ifs, line))
+	{
+		std::istringstream is_line(line);
+		std::string key;
+		is_line >> key;
+		cout << key << ": ";
+		std::string word;
+		std::vector<std::string> vals;
+		while (is_line >> word)
+		{
+			// print the read word
+			cout << word << " ";
+			vals.push_back(word);
+		}
+		cout <<  "\n";
+		properties.emplace(key, vals);
+	}
+	return properties;
+}

@@ -28,24 +28,26 @@ enum class KPMKernels
 
 struct KPMGParams
 {
-public:
 	float GA; 		//affine shear modulus
-	unsigned int DOF; // Total degrees of freedom/matrix size
-	float Volume;
+	float density;
 	float nu; 		//~friction coeff
 	float wmin;     //atom, CG: 0.1
 	float wmax;  	//atom, CG: 1000
-	unsigned int nw;//atom, CG: 200
-	KPMGParams();
-	KPMGParams(float GAT, float V, float nuT,float wminT, float wmaxT, unsigned int nPoints ):
-				GA(GAT), Volume(V), nu(nuT), wmin(wminT), wmax(wmaxT), nw(nPoints){};
+	unsigned int wcount;//atom, CG: 200
+
+//GDOS params
+	float wcut;
+	int nFreq;
+//	KPMGParams():GA{0.0}, density{1.0}, nu{1.0}, wmin{1.0}, wmax{100000}, nw{400},c_wcut{0.001},nFreq(4000){};
+	KPMGParams(float GAT=0.0, float density=1.0, float nuT=1.0,float wminT=1.0, float wmaxT=100000, unsigned int nPoints=400 ):
+				GA{GAT}, density{density}, nu{nuT}, wmin{wminT}, wmax{wmaxT}, wcount{nPoints},wcut{0.001},nFreq(4000){};
 
 	using Pointer = std::unique_ptr<KPMGParams>;
 };
 
 struct KPMParams
 {
-public:
+	KPMMode mode;
 	/**
 	 * @brief MAximum degree of polynomial
 	 */
@@ -66,10 +68,21 @@ public:
 	 * @brief Jackson kernel
 	 */
 	Vector		m_jk;
+
+	//If mode == KPMMode::GDOS
+	float density;
+	std::string lammps_data_file;
+	std::string af_file;
 	Vector MinvSqrt;
 	Vector af;
+//	VectorPointer MinvSqrt;
+//	VectorPointer af;
 public:
 	KPMParams():epsilon(0.05),kernel(KPMKernels::Jackson),lkernel(0),emin(0.0f),emax(0.0f){};
+	bool readFromFile(std::string filename);
+	bool readAF();
+	bool readM();
+	bool writeToFile(std::string filename);
 	void setAF(const Vector& af);
 	void setMassVectorInvSqrt(const Vector& mInvSqrt);
 	void setMassVectorInvSqrt(float m, unsigned int DOF);

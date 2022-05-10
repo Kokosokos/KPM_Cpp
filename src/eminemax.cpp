@@ -40,6 +40,7 @@ int main(int argc, char* argv[])
 	stream = fopen("emin_emax.dat", "w");
 	fprintf(stream, "%f %f\n", e_limits[0], e_limits[1] );
 	fclose(stream);
+
 	return 0;
 }
 

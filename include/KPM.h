@@ -9,14 +9,17 @@
 
 using namespace std;
 
-class KPM {
+class KPM
+{
 
 public:
 	KPM(sMatrixPointer hessian, const KPMParams& params,  const vector<int>&sizes, const vector<int>&displacements, MPI_Comm inworld=MPI_COMM_WORLD);
+	KPM(const KPMParams& params, const Vector& gp);
 	~KPM() = default;
 
-	virtual Vector getCoefficients(int chebKind = 2) = 0; // 1 or 2
-	Vector sumSeries(const Vector& freq, const Vector& gP, int chebKind = 2);
+	virtual void calculateCoefficients(int chebKind = 2); // 1 or 2
+	const Vector& getCoefficients() const;
+	Vector sumSeries(const Vector& freq, int chebKind = 2);
 
 	using Pointer = std::unique_ptr<KPM>;
 
@@ -34,6 +37,7 @@ protected:
 	 * @brief Hessian matrix.
 	 */
 	sMatrixPointer  m_hessian;
+	Vector			m_gp;
 	/**
 	 * @brief Parameters of the KPM
 	 */
@@ -49,27 +53,29 @@ protected:
 class KPMDOS: public KPM
 {
 public:
-	using KPM::KPM;
-	virtual Vector getCoefficients(int chebKind = 2) override;
+//	using KPM::KPM;
+	KPMDOS(sMatrixPointer hessian, const KPMParams& params, const vector<int>&sizes, const vector<int>&displacements,MPI_Comm inworld);
+	virtual void calculateCoefficients(int chebKind = 2) override;
+
 	using Pointer = std::unique_ptr<KPMDOS>;
 };
 
 class KPMGammaDOS: public KPM
 {
 public:
-	using KPM::KPM;
-	virtual Vector getCoefficients(int chebKind = 2) override;
+	KPMGammaDOS(sMatrixPointer hessian, const KPMParams& params, const vector<int>&sizes, const vector<int>&displacements,MPI_Comm inworld);
+	virtual void calculateCoefficients(int chebKind = 2) override;
+//	using KPM::KPM;
 	using Pointer = std::unique_ptr<KPMGammaDOS>;
 private:
 };
-
-
 
 class ShearModulus
 {
 public:
 	ShearModulus() = default;
 	~ShearModulus() = default;
+
 	Vector getStorage(KPMGParams params,  const Vector& gdos_freq, const Vector& gdos, const Vector& freq);
 	Vector getLoss(KPMGParams params, const Vector& gdos_freq, const Vector& gdos, const Vector& freq);
 };

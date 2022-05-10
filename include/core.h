@@ -17,9 +17,10 @@
 //#define WITHOPENCV
 #include <iostream>
 #include <memory>
-const double c_PI=3.14159;
-
 #include <Eigen/Sparse>
+#include "mpi.h"
+
+const double c_PI=3.14159;
 
 const   Eigen::StorageOptions c_myStorageOrder =  Eigen::RowMajor;
 typedef long int indexType;
@@ -33,6 +34,83 @@ using Vector = Eigen::VectorXd;
 using VectorPointer = std::unique_ptr<Vector>;
 
 
+
+inline void processRunningStatus(float progress)
+{
+#ifdef VERBOSE
+	int rank = 0;
+	int flag;
+	MPI_Initialized(&flag);
+	if(flag)
+		MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	if(rank == 0)
+	{
+		int barWidth = 70;
+
+		std::cout << "[";
+		int pos = barWidth * progress;
+		for (int i = 0; i < barWidth; ++i) {
+			if (i < pos) std::cout << "=";
+			else if (i == pos) std::cout << ">";
+			else std::cout << " ";
+		}
+		std::cout << "] " << int(progress * 100.0) << " %\r";
+		std::cout.flush();
+	}
+#endif
+}
+
+
+inline void processError( std::string message)
+{
+#ifdef VERBOSE
+	int rank = 0;
+	int flag;
+	MPI_Initialized(&flag);
+	if(flag)
+		MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+	if(rank == 0)
+	{
+		std::cerr << message<< std::endl;
+		std::cerr.flush();
+	}
+#endif
+}
+
+inline void processStatus( std::string message)
+{
+#ifdef VERBOSE
+	int rank = 0;
+	int flag;
+	MPI_Initialized(&flag);
+	if(flag)
+		MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+	if(rank == 0)
+	{
+		std::cout << message<< std::endl;
+		std::cout.flush();
+	}
+#endif
+}
+
+inline void processEnded()
+{
+#ifdef VERBOSE
+	int rank = 0;
+	int flag;
+	MPI_Initialized(&flag);
+	if(flag)
+			MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+	if(rank==0)
+	 {
+		std::cout<<std::endl;
+		std::cout.flush();
+	 }
+#endif
+}
 
 //Numpy-like functions
 inline Vector ones(int size)
@@ -55,13 +133,43 @@ inline  Vector arange(int N, float min, float max)
 	return Vector::LinSpaced(N,min,max);
 }
 
+//Only positive?
 inline  Vector logspace(int N, float min, float max)
 {
 	float minPow = log10(min);
 	float maxPow = log10(max);
 	return Eigen::pow(10,Vector::LinSpaced(N,minPow,maxPow).array());
 }
+inline  Vector logspace(int N, float min, float max,  float cut)
+{
+	cut = fabs(cut);
+	if (min > max || (fabs(min)<cut and fabs(max) < cut ))
+	{
+		processStatus("Warning: core: logspace: (min > max || (fabs(min)<cut and fabs(max) < cut ))");
+		processStatus(std::to_string(min) + ", "+ std::to_string(max)+", "+ std::to_string(cut));
+		return Vector{};
+	}
+	if (min > cut and max > cut)
+		return logspace(N,min,max);
+	if (min > -cut && max > cut)
+		return logspace(N,cut,max);
+	if (min < -cut && max > cut)
+	{
+		Vector neg,pos;
+		int nneg = int( N*(fabs(min)-cut) / (fabs(min) + fabs(max) - 2*cut) );
+		int npos = int( N*(fabs(min)-cut) / (fabs(min) + fabs(max) - 2*cut) );
+		neg = -1.0*logspace(nneg,cut, fabs(min));
+		pos = logspace(npos, cut, max);
 
+		Vector freq = Vector(nneg + npos);
+		freq <<neg.reverse(),pos;
+		return freq;
+	}
+
+	return Vector{};
+
+
+}
 inline  Vector sin(Vector v)
 {
 	return Eigen::sin(v.array());
@@ -116,20 +224,19 @@ template <typename T> int sgn(T val) {
 }
 
 
-#include <Eigen/Dense>
-#include <boost/random/mersenne_twister.hpp>
-#include <boost/random/normal_distribution.hpp>
-#include <time.h>       /* time for the seed*/
-/*
-  We need a functor that can pretend it's const,
-  but to be a good random number generator
-  it needs mutable state.
- */
+//#include <Eigen/Dense>
+//#include <boost/random/mersenne_twister.hpp>
+//#include <boost/random/normal_distribution.hpp>
+//#include <time.h>       /* time for the seed*/
+///*
+//  We need a functor that can pretend it's const,
+//  but to be a good random number generator
+//  it needs mutable state.
+// */
 
 #include <random>
 #include <algorithm>
 
-#include "mpi.h"
 //std::random_device{}() - seed to std::mt19937_64
 auto normalrnd = [](float mean, float sigma)
 {
@@ -179,79 +286,6 @@ inline Vector normal( unsigned int nn)
 }
 
 
-inline void processRunningStatus(float progress)
-{
-#ifdef VERBOSE
-	int rank = 0;
-	int flag;
-	MPI_Initialized(&flag);
-	if(flag)
-		MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	if(rank == 0)
-	{
-		int barWidth = 70;
-
-		std::cout << "[";
-		int pos = barWidth * progress;
-		for (int i = 0; i < barWidth; ++i) {
-			if (i < pos) std::cout << "=";
-			else if (i == pos) std::cout << ">";
-			else std::cout << " ";
-		}
-		std::cout << "] " << int(progress * 100.0) << " %\r";
-		std::cout.flush();
-	}
-#endif
-}
-
-
-inline void processStatus( std::string message)
-{
-#ifdef VERBOSE
-	int rank = 0;
-	int flag;
-	MPI_Initialized(&flag);
-	if(flag)
-		MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-	if(rank == 0)
-	{
-		std::cout << message<< std::endl;
-		std::cout.flush();
-	}
-#endif
-}
-
-inline void processEnded()
-{
-#ifdef VERBOSE
-	int rank = 0;
-	int flag;
-	MPI_Initialized(&flag);
-	if(flag)
-			MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-	if(rank==0)
-	 {
-		std::cout<<std::endl;
-		std::cout.flush();
-	 }
-#endif
-}
-
-inline std::vector<unsigned int>	trueIndexes( const std::vector<bool> &vector )
-{
-	std::vector<unsigned int>	indices;
-
-	auto it = std::find_if(std::begin(vector), std::end(vector), [](bool element){return element;});
-	while (it != std::end(vector)) {
-	   indices.emplace_back(std::distance(std::begin(vector), it));
-	   it = std::find_if(std::next(it), std::end(vector), [](bool element){return element;});
-	}
-	indices.shrink_to_fit();
-
-	return	indices;
-} // end function trueIndexes
 
 
 #endif /* __CORE_H_ */

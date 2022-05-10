@@ -12,6 +12,9 @@
 #include <iostream>
 #include "core.h"
 #include <unistd.h>
+#include <unordered_map>
+#include "KPMParameters.h"
+
 std::string mem();
 using namespace std; // BAD BAD BAD
 
@@ -43,11 +46,14 @@ public:
 	 * @param[in] af  The affine force field vector.
 	 */
 	void readAF(string filename, Vector& af);
+	VectorPointer  readAF(string filename);
 	/**
 	 * @brief Reads mass info from Lammps data file. Fills 1/sqrt(m_i) vector. Returns box Volume
 	 */
-	float readLAMMPSData(string filename, Vector& minvSqrt); //reads m_M (particle masses) from lammps data file
 
+	static std::unordered_map<std::string,std::vector<std::string>> readParameters(string filename);
+	static KPMGParams readKPMGParameters(string filename);
+	float readLAMMPSData(string filename, Vector& minvSqrt); //reads m_M (particle masses) from lammps data file
 	//-----------------------------------------
 };
 

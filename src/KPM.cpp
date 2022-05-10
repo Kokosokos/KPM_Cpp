@@ -15,17 +15,24 @@
 #include "KPM.h"
 #include <Eigen/Core>
 #include <Eigen/SparseCore>
-
 //========================================================================================================
 
 KPM::KPM(sMatrixPointer hessian, const KPMParams& params, const vector<int>&sizes, const vector<int>&displacements,MPI_Comm inworld):
 				m_hessian(std::move(hessian)), m_params(params), m_world(inworld),
 				m_sizes(sizes), m_displacements(displacements)
 {
-	m_DOF = m_hessian->cols();
 	MPI_Comm_rank(m_world, &m_mpi_rank);
 	MPI_Comm_size(m_world, &m_mpi_size);
+	m_DOF = m_hessian->cols();
 	HTilde();
+}
+KPM::KPM(const KPMParams& params, const Vector& gp):m_params(params), m_gp(gp)
+{
+}
+
+void KPM::calculateCoefficients(int chebKind)
+{
+	processStatus("Base class getCoefficients");
 }
 //-------------------------------------------------------------------------------
 
@@ -74,13 +81,22 @@ void KPM::HTilde()
 }
 //-------------------------------------------------------------------------------
 
-Vector KPM::sumSeries(const Vector& freq, const Vector& gP, int chebKind)
+Vector KPM::sumSeries(const Vector& freq, int chebKind)
 {
+	processStatus("Sum 1");
 	Vector sumKPM = zeros(freq.size());
 	Vector e = sign(freq).cwiseProduct(sqr(freq));
+	processStatus("Sum 2");
+	processStatus("Sum 3 "  +  std::to_string(m_params.K));
+	processStatus("Sum 3 "  +  std::to_string(m_params.R)   );
+	processStatus("Sum 3 " +  std::to_string(m_params.density)   );
+
 	ETilde(e);
+	processStatus("Sum 4");
 	Vector	arccosArgument	= arccos(e);
+	processStatus("Sum 5");
 	Vector 	prefactor = ones(freq.size());
+	processStatus("Sum 6");
 	if(chebKind == 2)
 	{
 		prefactor  = 4*abs(freq)*abs((2.0-m_params.getEpsilon())/c_PI/(m_params.getEmax()-m_params.getEmin()));
@@ -95,28 +111,32 @@ Vector KPM::sumSeries(const Vector& freq, const Vector& gP, int chebKind)
 	for ( unsigned int k =0; k < m_params.getK(); ++k)
 	{
 		if(chebKind == 2)
-			sumKPM			+= prefactor.cwiseProduct(( m_params.m_jk[k]*gP[k]/m_params.getR())  * sin((k + 1.0) * arccosArgument));
+			sumKPM			+= prefactor.cwiseProduct(( m_params.m_jk[k]*m_gp[k]/m_params.getR())  * sin((k + 1.0) * arccosArgument));
 		else
-			sumKPM			+= cof*prefactor.cwiseProduct(( m_params.m_jk[k]*gP[k]/m_params.getR())  * cos((k) * arccosArgument));
+			sumKPM			+= cof*prefactor.cwiseProduct(( m_params.m_jk[k]*m_gp[k]/m_params.getR())  * cos((k) * arccosArgument));
 
 		cof = 2;
 	}
 	return sumKPM;
 }
 //========================================================================================================
-
-Vector KPMDOS::getCoefficients(int chebKind)
+KPMDOS::KPMDOS(sMatrixPointer hessian, const KPMParams& params, const vector<int>&sizes, const vector<int>&displacements,MPI_Comm inworld):
+				KPM(std::move(hessian), params,sizes, displacements,inworld)
 {
-	Vector loc_gP  = zeros(m_params.getK()); // gauss projection
+	calculateCoefficients();
+}
 
-	unsigned int out=0;
-
+void KPMDOS::calculateCoefficients(int chebKind)
+{
+	processStatus("KPMDOS class getCoefficients");
 	if (!(chebKind == 1 || chebKind == 2))
 	{
 		processStatus(string("ERROR: chebKind must be 1 or 2" + chebKind));
 	}
-	Vector v_r = zeros(m_DOF);
+	Vector loc_gP  = zeros(m_params.getK()); // gauss projection
 	Vector polyChebCurrRank = zeros(m_sizes[m_mpi_rank]);
+	Vector v_r = zeros(m_DOF);
+	unsigned int out=0;
 	for (unsigned int r = 0; r < m_params.getR(); r+=1)
 	{
 		if (100 * r / m_params.getR() > out )
@@ -125,7 +145,6 @@ Vector KPMDOS::getCoefficients(int chebKind)
 			out+=10;
 		}
 
-//		Vector v_r = uniform(m_DOF);
 		if(m_mpi_rank == 0)
 		{
 			v_r = normal(m_DOF);
@@ -141,9 +160,7 @@ Vector KPMDOS::getCoefficients(int chebKind)
 
 		//k = 1
 		polyChebCurrRank = chebKind * (*m_hessian) * polyChebPrev;
-
 		MPI_Allgatherv( polyChebCurrRank.data(), polyChebCurrRank.size(), MPI_DOUBLE, polyChebCurr.data(), m_sizes.data(), m_displacements.data(), MPI_DOUBLE,  m_world);
-
 		polyChebPrevPrev = polyChebPrev;
 		polyChebPrev = polyChebCurr;
 
@@ -155,7 +172,6 @@ Vector KPMDOS::getCoefficients(int chebKind)
 
 			polyChebCurrRank = 2 * (*m_hessian) * polyChebPrev;
 			MPI_Allgatherv( polyChebCurrRank.data(), polyChebCurrRank.size(), MPI_DOUBLE, polyChebCurr.data(), m_sizes.data(), m_displacements.data(), MPI_DOUBLE,  m_world);
-
 			polyChebCurr = polyChebCurr - polyChebPrevPrev;
 			loc_gP[k] += v_r.transpose() * polyChebCurr;
 			polyChebPrevPrev = polyChebPrev;
@@ -165,20 +181,28 @@ Vector KPMDOS::getCoefficients(int chebKind)
 	}
 	processRunningStatus(1.0f);
 	processEnded();
-	return loc_gP;
+	m_gp = loc_gP;
+}
+
+const Vector& KPM::getCoefficients() const {
+	return m_gp;
 }
 //========================================================================================================
 
 //-------------------------------------------------------------------------------
-
-Vector KPMGammaDOS::getCoefficients(int chebKind)
+KPMGammaDOS::KPMGammaDOS(sMatrixPointer hessian, const KPMParams& params, const vector<int>&sizes, const vector<int>&displacements,MPI_Comm inworld):
+				KPM(std::move(hessian), params,sizes, displacements,inworld)
 {
-
+	calculateCoefficients();
+}
+void KPMGammaDOS::calculateCoefficients(int chebKind)
+{
+	processStatus("KPMGammaDOS class getCoefficients");
+	if (!(chebKind == 1 || chebKind == 2))
+	{
+		processStatus(string("ERROR: chebKind must be 1 or 2" + chebKind));
+	}
 	Vector loc_gP  = zeros(m_params.getK()); // gauss projection
-
-
-	if(m_mpi_rank==0)
-		cout <<"MPI size:"<< m_mpi_size<<endl;
 	Vector v_r = zeros(m_DOF);
 	unsigned int out=0;
 	for (unsigned int r = 0; r < m_params.getR(); r+=1)
@@ -187,7 +211,6 @@ Vector KPMGammaDOS::getCoefficients(int chebKind)
 		{
 			processRunningStatus(float(r)/m_params.getR());
 			out+=10;
-
 		}
 
 		if(m_mpi_rank == 0)
@@ -197,13 +220,12 @@ Vector KPMGammaDOS::getCoefficients(int chebKind)
 		}
 		MPI_Bcast(v_r.data(), m_DOF, MPI_DOUBLE, 0, m_world);
 
-		double mLeft = m_params.af.dot(v_r);
-
 		Vector polyChebCurrRank = v_r;
 		Vector polyChebCurr = v_r;
 		Vector polyChebPrevPrev = v_r;
 		Vector polyChebPrev = v_r;
 
+		double mLeft = m_params.af.dot(v_r);
 		loc_gP[0] += mLeft * mLeft;
 
 		//k = 1
@@ -227,8 +249,7 @@ Vector KPMGammaDOS::getCoefficients(int chebKind)
 	}
 	processRunningStatus(1.0f);
 	processEnded();
-//	MPI_Reduce(loc_gP.data(), glob_gP.data(), m_params.getK(), MPI_DOUBLE, MPI_SUM, 0, m_world);
-	return loc_gP;
+	m_gp = loc_gP;
 }
 
 
@@ -241,7 +262,7 @@ Vector ShearModulus::getStorage(KPMGParams params,  const Vector& gdos_freq, con
 	{
 			Vector ediff = e - ones(vsize) * freq[i] * freq[i];
 
-			Vector denom = ((sqr(ediff) + ones(vsize)*(params.nu * freq[i])*(params.nu * freq[i])) * params.Volume / params.DOF).cwiseInverse();
+			Vector denom = ((sqr(ediff) + ones(vsize)*(params.nu * freq[i])*(params.nu * freq[i])) * params.density / 3.0 ).cwiseInverse();
 ;
 			Gp[i] = params.GA - trapz(gdos.cwiseProduct(ediff).cwiseProduct(denom), gdos_freq);
  	}
@@ -259,7 +280,7 @@ Vector ShearModulus::getLoss(KPMGParams params,  const Vector& gdos_freq, const 
 	for( int i = 0; i < freq.size();++i)
 	{
 			Vector ediff = e - ones(vsize) * freq[i] * freq[i];
-			Vector denom = ((sqr(ediff) + ones(vsize)*(params.nu * freq[i])*(params.nu * freq[i])) * params.Volume / params.DOF).cwiseInverse();
+			Vector denom = ((sqr(ediff) + ones(vsize)*(params.nu * freq[i])*(params.nu * freq[i])) * params.density / 3.0).cwiseInverse();
 			Gpp[i] = trapz((gdos * freq[i] * params.nu).cwiseProduct(denom), gdos_freq);
  	}
 

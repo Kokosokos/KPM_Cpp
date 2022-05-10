@@ -12,7 +12,6 @@
 #include <iostream>
 #include <fstream>
 
-
 //!!!! Implement ZERO FREQ SHEAR MODULUS output!!!
 //!
 //!!!! Separate Kernel into interface + jackson, lorentzz....implementations.
@@ -34,13 +33,16 @@ using namespace boost::program_options;
 #include <iomanip>
 //
 
-int parseInput(int argc, char* argv[], KPMMode& kpmmode, KPMParams& params, KPMGParams& kpmGParams, KPMCalculation& kpmCalc,
-		vector<string>& csrFiles, vector<string>& gpFiles,
-		string& affile, string& mfile, float& m, bool& mconst );
 
+int parseInput(int argc, char* argv[], KPMParams& params, KPMCalculation& kpmCalc,
+				vector<string>& csrFiles, vector<string>& gpFiles );
 int main(int argc, char* argv[])
 {
-
+#ifdef DETERMINISTIC
+	processStatus("DETERMINISTIC run");
+#endif
+	auto GA = FileManager::readKPMGParameters("kpmG.config").GA;
+	auto kpmGParams = FileManager::readKPMGParameters("kpmG.config");
 	MPI_Init(&argc, &argv);
 
 	FileManager fmanager;
@@ -48,41 +50,38 @@ int main(int argc, char* argv[])
 	string gpFile;
 	string resFile;
 
-	KPMMode kpmMode = KPMMode::DOS;
 	KPMParams kpmParams;
 	KPMCalculation kpmCalc;
-	//Shear modulus output params
+
+//  Shear modulus output params
 //	KPMGParams kpmGParams(0.0, 1.0, 1.0, 1.0, 100000, 400); 	//atom
-	KPMGParams kpmGParams(0.0, 1.0, 1.0, 0.1, 1000, 200);		//CG model
+//	KPMGParams kpmGParams(0.0, 1.0, 1.0, 0.1, 1000, 200);		//CG model
 
 	//GDOS-only parameters
-	string affile;
-	string mfile;
-	float m = 1.0;
-	bool mconst = true;
-
 	vector<string> gpFiles;
 
-	if(!parseInput(argc, argv, kpmMode, kpmParams, kpmGParams, kpmCalc,
-				csrFiles, gpFiles,
-				affile, mfile, m, mconst ))
-			return 0;
-	gpFile  = kpmMode == KPMMode::GDOS?"gpGammaDOS.dat":"gpDOS.dat";
-	resFile = kpmMode == KPMMode::GDOS?"GammaDOS.dat":"DOS.dat";
+	if(parseInput(argc, argv, kpmParams, kpmCalc, csrFiles, gpFiles))
+		return 1;
+	kpmParams.readFromFile("test.config");
+	kpmGParams.density = kpmParams.density;
+	gpFile  = kpmParams.mode == KPMMode::GDOS?"gpGammaDOS.dat":"gpDOS.dat";
+	resFile = kpmParams.mode == KPMMode::GDOS?"GammaDOS.dat":"DOS.dat";
 
 	//KPM DOS/GDOS output frequencies
-	Vector freq = arange(4000, sgn(kpmParams.getEmin())*sqrt(fabs(kpmParams.getEmin())), sqrt(kpmParams.getEmax()));
+	float wmin = sgn(kpmParams.getEmin())*sqrt(fabs(kpmParams.getEmin()));
+	float wmax = sgn(kpmParams.getEmax())*sqrt(fabs(kpmParams.getEmax()));
+	Vector freq = arange(kpmGParams.nFreq, sgn(kpmParams.getEmin())*sqrt(fabs(kpmParams.getEmin())), sqrt(kpmParams.getEmax()));
 	//G', G'' frequencies
-	Vector logfreq = logspace(kpmGParams.nw, kpmGParams.wmin,kpmGParams.wmax);
-	if(kpmMode == KPMMode::GDOS)
+	Vector logfreq = logspace(kpmGParams.wcount, kpmGParams.wmin,kpmGParams.wmax);
+
+	if(kpmParams.mode == KPMMode::GDOS)
 	{
-		Vector neg,pos;
-		neg = -1.0*logspace(int(fabs(kpmParams.getEmin())),0.001, sqrt(fabs(kpmParams.getEmin())));
-		pos = logspace(int(kpmParams.getEmax()), 0.001, sqrt(kpmParams.getEmax()));
-
-		freq = Vector(neg.size() + pos.size());
-		freq <<neg.reverse(),pos;
-
+		freq = logspace(kpmGParams.nFreq, wmin, wmax,  kpmGParams.wcut);
+		if (freq.size() == 0)
+		{
+			processError("Error: main: Empty frequency vector");
+			exit(EXIT_FAILURE);
+		}
 	}
 
 	//KPM START
@@ -93,85 +92,62 @@ int main(int argc, char* argv[])
 	MPI_Comm comm=MPI_COMM_WORLD;
 	rank = MPI::COMM_WORLD.Get_rank();
 	size = MPI::COMM_WORLD.Get_size();
+	vector<int> sizes(size);
+	vector<int> displacements(size);
 
 	clock_t t;
 	clock_t tstart;
 	tstart = clock();
+
 	sMatrixPointer hessian;
-
-	vector<int> sizes(size);
-	vector<int> displacements(size);
-
-	//if not kpmCalc == KPMCalculation::Sum
-	hessian = std::move(fmanager.readCSR(csrFiles[0], csrFiles[1], csrFiles[2], std::move(hessian), sizes, displacements, comm));
-	if (!hessian)
-	{
-		processStatus("Error while reading CSR");
-		return 1;
-	}
-	kpmGParams.DOF = hessian->cols(); //to do: Avoid getting it from Hessian, to be able to just sum
-
+	KPM::Pointer kpm = nullptr;
 	Vector gp  = zeros(kpmParams.getK());
-	if(kpmMode == KPMMode::GDOS)
-	{
-		if(mconst)
-			kpmParams.setMassVectorInvSqrt(m, kpmGParams.DOF);
-		else
-		{
-			Vector minvSqrt;
-			kpmGParams.Volume = fmanager.readLAMMPSData(mfile, minvSqrt);
-			kpmParams.setMassVectorInvSqrt(minvSqrt);
-		}
-		Vector af;
-		fmanager.readAF(affile, af);
-		kpmParams.setAF(af);
-		processStatus("calculating coeffs...");
-	}
-//	KPM::Pointer kpm = nullptr;
-	auto kpm = kpmMode == KPMMode::GDOS ? KPM::Pointer( new KPMGammaDOS(std::move(hessian), kpmParams, sizes, displacements, comm)):
-			KPM::Pointer( new KPMDOS(std::move(hessian), kpmParams, sizes, displacements, comm));
-
 	//Gauss projection vectors calculation/read
 	//------------------------------------------------------------------------------------
 	if(kpmCalc == KPMCalculation::Sum)
 	{
-
 		processStatus("reading coeff files...");
 		for (unsigned int i =0; i< gpFiles.size(); ++i)
 		{
-			processStatus(gpFiles[i]);
+//			processStatus(gpFiles[i]);
 			Vector locgp = zeros(kpmParams.getK());
 			fmanager.read(gpFiles[i], locgp);
 
 			gp += locgp(Eigen::seq(0,kpmParams.getK()-1));
 		}
+		kpm = KPM::Pointer(new KPM(kpmParams, gp));
+		fmanager.write("gpSUM.dat",kpm->getCoefficients());
 	}
 	else
 	{
+
+		hessian = std::move(fmanager.readCSR(csrFiles[0], csrFiles[1], csrFiles[2], std::move(hessian), sizes, displacements, comm));
+		if (!hessian)
+		{
+			processStatus("Error while reading CSR");
+			return 1;
+		}
 		processStatus("calculating coeffs...");
-		gp = kpm->getCoefficients();
+		kpm = kpmParams.mode == KPMMode::GDOS ? KPM::Pointer( new KPMGammaDOS(std::move(hessian), kpmParams, sizes, displacements, comm)):
+				KPM::Pointer( new KPMDOS(std::move(hessian), kpmParams, sizes, displacements, comm));
 	}
+	//------------------------------------------------------------------------------------
 
 	if(rank == 0)
 	{
 		if(kpmCalc == KPMCalculation::Full)
-			fmanager.write(gpFile,gp);
+			fmanager.write(gpFile,kpm->getCoefficients());
 
 		processStatus("Sum series started...");
-		Vector res = kpm->sumSeries(freq, gp);
-
-		fmanager.write(resFile,freq, res);
 		fmanager.write("freq.dat",freq);
+		Vector res = kpm->sumSeries(freq);
+		fmanager.write(resFile,freq, res);
+
 		t = clock() - tstart;
 
 		processStatus(string("It took me ")+ to_string(((float)t)/CLOCKS_PER_SEC) +"seconds.");
-		FILE *stream;
-		stream = fopen("time.dat", "a");
-		int mpi_size;
-		MPI_Comm_size(comm, &mpi_size);
-		fprintf(stream, "%d %d %d %f %s\n", kpmParams.getK(), kpmParams.getR(),mpi_size, ((float)t)/CLOCKS_PER_SEC, mem().c_str());
-		fclose(stream);
-		if(kpmMode == KPMMode::GDOS)
+
+		if(kpmParams.mode == KPMMode::GDOS)
 		{
 			ShearModulus smodulus;
 			Vector Gp = smodulus.getStorage(kpmGParams, freq, res, logfreq);
@@ -179,55 +155,41 @@ int main(int argc, char* argv[])
 			Vector Gpp = smodulus.getLoss(kpmGParams, freq, res, logfreq);
 			fmanager.write("Gpp.dat",logfreq, Gpp);
 		}
+		//------------------------------------------------------------------------------------
+		FILE *stream;
+		stream = fopen("time.dat", "a");
+		int mpi_size;
+		MPI_Comm_size(comm, &mpi_size);
+		fprintf(stream, "%d %d %d %f %s\n", kpmParams.getK(), kpmParams.getR(),mpi_size, ((float)t)/CLOCKS_PER_SEC, mem().c_str());
+		fclose(stream);
+		//------------------------------------------------------------------------------------
 	}
-
 	MPI_Finalize();
 	return 0;
 }
 
-int parseInput(int argc, char* argv[], KPMMode& kpmmode, KPMParams& params, KPMGParams& kpmGParams, KPMCalculation& kpmCalc,
-				vector<string>& csrFiles, vector<string>& gpFiles,
-				string& affile, string& mfile, float& m, bool& mconst )
+int parseInput(int argc, char* argv[], KPMParams& params, KPMCalculation& kpmCalc,
+				vector<string>& csrFiles, vector<string>& gpFiles )
 {
-	int K = 1000;
-	int R = 20;
-	float epsilon = 0.05;
-	float emin = 0.0f;
-	float emax = 0.0f;
 	kpmCalc = KPMCalculation::Full;
-	string kernel = "jk";
-	int lkernel=4;
+	int flag;
+	int rank = 0;
+	MPI_Initialized(&flag);
+	if(flag)
+		MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	//Reading arguments
 		//------------------------------------------------------------------------------------
 		options_description all{"Options"};
 		options_description necessary{"Necessary"};
 		options_description optional{"Optional"};
-		options_description gdos{"GammaDOS(--gdos) specific"};
 		try
 		{
-
-			//		namespace po = boost::program_options;
 			necessary.add_options()
-		    							  ("help,h", "Help screen")
-										  ("csr", value<vector<string>>(&csrFiles)->multitoken()->required(), "Input CSR fromatted matrix. data, indices and indptr filenames.")
-										  ("mode", value<string>()->required(), "set mode: dos or gdos")
-										  ("emin", value<float>(&emin), "Set the minimum eigenvalue")
-										  ("emax", value<float>(&emax), "Set the maximum eigenvalue");
+		    		("help,h", "Help screen");
 			optional.add_options()
-										  ("K", value<int>(&K)->default_value(1000), "Set the maximum polynomial  order")
-										  ("R", value<int>(&R)->default_value(20), "Set the number of random vectors")
-										  ("mfile", value<string>(), "lammps data file to read masses")
-										  ("e", value<float>(&epsilon)->default_value(0.05), "Set the epsilon value")
-										  ("kernel", value<string>()->default_value("jk"), "Choose kernel")
-										  ("l", value<int>()->default_value(4), "Choose kernel parameter (if using Lorentz kernel)")
-										  ("m", value<float>(), "constant mass value")
-										  ("gp", value<vector<string>>(&gpFiles)->multitoken(), "gauss projection files (skip calculation and just sum)");
-			gdos.add_options()
-										  ("af", value<string>(), "affine force filename")
-										  ("nu", value<float>(), "friction coeff")
-										  ("GA", value<float>(), "affine shear modulus");
-
-			all.add(necessary).add(optional).add(gdos);
+					("csr", value<vector<string>>(&csrFiles)->multitoken(), "Input CSR fromatted matrix. data, indices and indptr filenames.")
+					("gp", value<vector<string>>(&gpFiles)->multitoken(), "gauss projection files (skip calculation and just sum)");
+			all.add(necessary).add(optional);
 			variables_map vm;
 
 			store(parse_command_line(argc, argv, all), vm);
@@ -235,123 +197,37 @@ int parseInput(int argc, char* argv[], KPMMode& kpmmode, KPMParams& params, KPMG
 			if (vm.count("help") || argc == 1)
 			{
 				argc = 1;
-				std::cout << all << '\n';
-				return 0;
+
+				if(rank == 0)
+					std::cout << all << '\n';
+				return 1;
 			}
 
-			if (vm.count("K"))
-			{
-				processStatus(string( "K: " +  to_string(K)));
-
-			}
-
-			if (vm.count("R"))
-			{
-				processStatus(string( "R: " + to_string(R) ));
-			}
-			if (vm.count("e"))
-			{
-				processStatus(string( "epsilon: ") +  to_string(vm["e"].as<float>()));
-//				epsilon = vm["e"].as<float>();
-			}
-			if (vm.count("kernel"))
-			{
-				processStatus(string( "kernel: " +  vm["kernel"].as<string>()));
-				kernel = vm["kernel"].as<string>();
-				if (vm.count("l"))
-				{
-					processStatus(string( "l: " + vm["l"].as<int>() ));
-					lkernel = vm["l"].as<int>();
-				}
-
-			}
-			if (vm.count("emin") && vm.count("emax"))
-			{
-				params.setEminEmax(emin, emax);
-			}
+			if(vm.count("gp"))
+				kpmCalc = KPMCalculation::Sum;
 			else
 			{
-				processStatus(string( "Error: please provide emin/emax. (Use eminemax tool from the same 'package')"));
-				return 0;
-			}
-
-
-			if (vm.count("mode"))
-			{
-				processStatus(string( "Parsing mode..."));
-				if(vm.count("gp"))
-					kpmCalc = KPMCalculation::Sum;
-				if(vm["mode"].as<string>() == "dos")
-					kpmmode = KPMMode::DOS;
-				else if(vm["mode"].as<string>() == "gdos")
+				if( csrFiles.size() == 3 )
 				{
-					kpmmode = KPMMode::GDOS;
-					if (vm.count("af") && vm.count("GA") && ( vm.count("mfile") || vm.count("m")))
-					{
-						affile = vm["af"].as<string>();
-						kpmGParams.GA = vm["GA"].as<float>();
-						if (vm.count("nu"))
-							kpmGParams.nu = vm["nu"].as<float>();
-						if(vm.count("mfile"))
-						{
-							mfile = vm["mfile"].as<string>();
-							mconst = false;
-						}
-						else
-						{
-							m = vm["m"].as<float>();
-							mconst = true;
-						}
-
-					}
-					else
-					{
-						processStatus(string( "Error: please provide  affine force file(--af), affine shear modulus(--GA) and lammps data file (--mfile or --m for constant mass) for gammaDOS calculation."));
-						return 0;
-					}
-
-
+					processStatus(string("CSR files: " + csrFiles[0]+ " "+ csrFiles[1]+" "+csrFiles[2]));
 				}
 				else
 				{
-					processStatus(string( "Error: unknown mode"));
-					return 0;
+					processStatus(string("Error: Please provide 3 files when using --csr: data, indices and indptr."));
+					return 1;
 				}
-
-			}
-			else
-			{
-				processStatus(string("Error: Please specify a mode: dos or gdos"));
-				return 0;
-			}
-
-			if( csrFiles.size() == 3 )
-			{
-				processStatus(string("CSR files: " + csrFiles[0]+ " "+ csrFiles[1]+" "+csrFiles[2]));
-			}
-			else
-			{
-				processStatus(string("Error: Please provide 3 files when using --csr: data, indices and indptr."));
-				return 0;
 			}
 			processStatus(string("Parsing input args ended.."));
 
 		}
 		catch (const error &ex)
 		{
-			std::cerr << ex.what() << '\n';
-			std::cout << all << '\n';
-			return 0;
+			if(rank == 0)
+			{
+				std::cerr << ex.what() << '\n';
+				std::cout << all << '\n';
+			}
+			return 1;
 		}
-		params.setK(K);
-		params.setR(R);
-		params.setEpsilon(epsilon);
-		if(kernel == "jk")
-			params.setKernel(KPMKernels::Jackson);
-		if(kernel == "lk")
-		{
-			params.setKernel(KPMKernels::Lorentz);
-			params.setLKernel(lkernel);
-		}
-		return 1;
+		return 0;
 }
